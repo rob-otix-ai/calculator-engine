@@ -74,3 +74,6 @@ export {
   calculateEstateValue,
   type BlendedPortfolio,
 } from './portfolio';
+
+// Logger utilities
+export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';

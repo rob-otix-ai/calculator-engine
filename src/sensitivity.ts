@@ -1,4 +1,5 @@
 import type { Scenario, Metrics } from './types';
+import { getLogger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Sensitivity Analysis (Tornado Chart)
@@ -66,6 +67,9 @@ export function runSensitivityAnalysis(
   scenario: Scenario,
   projectionFn: (s: Scenario) => { metrics: Metrics },
 ): SensitivityFactor[] {
+  const log = getLogger();
+  log.info('Starting sensitivity analysis', { parameterCount: PARAMETERS.length });
+
   const factors: SensitivityFactor[] = [];
 
   for (const param of PARAMETERS) {
@@ -114,6 +118,14 @@ export function runSensitivityAnalysis(
     (highScenario as Record<string, unknown>)[param.name] = highValue;
     const highResult = projectionFn(highScenario);
 
+    const spread = Math.abs(highResult.metrics.terminal_real - lowResult.metrics.terminal_real);
+    log.debug('Sensitivity parameter result', {
+      name: param.name,
+      lowTerminal: lowResult.metrics.terminal_real,
+      highTerminal: highResult.metrics.terminal_real,
+      spread,
+    });
+
     factors.push({
       name: param.name,
       label: param.label,
@@ -121,12 +133,14 @@ export function runSensitivityAnalysis(
       highValue,
       lowTerminal: lowResult.metrics.terminal_real,
       highTerminal: highResult.metrics.terminal_real,
-      spread: Math.abs(highResult.metrics.terminal_real - lowResult.metrics.terminal_real),
+      spread,
     });
   }
 
   // Sort by spread descending (largest impact first)
   factors.sort((a, b) => b.spread - a.spread);
+
+  log.info('Sensitivity complete', { topFactor: factors[0]?.name });
 
   return factors;
 }

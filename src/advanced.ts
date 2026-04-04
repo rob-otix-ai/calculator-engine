@@ -29,6 +29,7 @@ import {
   calculateWithdrawal,
   type GKState,
 } from './withdrawal';
+import { getLogger } from './logger';
 
 // =============================================================================
 // Helper Functions
@@ -179,6 +180,13 @@ export function runAdvancedProjection(
     black_swan_loss_pct,
     desired_estate,
   } = scenario;
+
+  const log = getLogger();
+  log.info('Starting advanced projection', {
+    currentAge: current_age,
+    retirementAge: retirement_age,
+    itemCount: financial_items.length,
+  });
 
   const items = financial_items.filter((item) => item.enabled);
 
@@ -569,7 +577,9 @@ export function runAdvancedProjection(
 
         // Cap at available cash
         if (contrib > Math.max(0, cashBalance)) {
-          shortfallContributions += contrib - Math.max(0, cashBalance);
+          const shortfall = contrib - Math.max(0, cashBalance);
+          log.warn('Contribution shortfall', { age, shortfall, requested: contrib, available: Math.max(0, cashBalance) });
+          shortfallContributions += shortfall;
           contrib = Math.max(0, cashBalance);
         }
 
@@ -654,6 +664,9 @@ export function runAdvancedProjection(
     // =====================================================================
 
     const insolvency = cashBalance < 0;
+    if (insolvency) {
+      log.warn('Insolvency detected', { age, cashBalance });
+    }
     if (insolvency && firstShortfallAge === null) {
       firstShortfallAge = age;
     }
@@ -840,6 +853,12 @@ export function runAdvancedProjection(
         ? Math.min(200, (totalActual / totalDesired) * 100)
         : 100;
   }
+
+  const insolvencyCount = timeline.filter((r) => r.insolvency).length;
+  log.info('Advanced projection complete', {
+    terminalReal,
+    insolvencyCount,
+  });
 
   const metrics: Metrics = {
     terminal_nominal: terminalNominal,

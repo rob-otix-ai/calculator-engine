@@ -1,4 +1,5 @@
 import type { Scenario, Metrics } from './types';
+import { getLogger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Retirement Age x Spending Heatmap
@@ -65,6 +66,9 @@ export function generateHeatmap(
   const ageStep = (ageMax - ageMin) / (effectiveSteps - 1);
   const spendStep = (spendMax - spendMin) / (effectiveSteps - 1);
 
+  const log = getLogger();
+  log.info('Generating heatmap', { rows: effectiveSteps, cols: effectiveSteps });
+
   const cells: HeatmapCell[] = [];
   const desiredEstate = scenario.desired_estate ?? 0;
 
@@ -100,6 +104,9 @@ export function generateHeatmap(
       });
     }
   }
+
+  const viableCells = cells.filter((c) => c.viable).length;
+  log.info('Heatmap complete', { viableCells, totalCells: cells.length });
 
   return cells;
 }

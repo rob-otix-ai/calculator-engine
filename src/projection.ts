@@ -17,6 +17,7 @@ import {
   NEAR_ZERO_THRESHOLD,
   type GKState,
 } from './withdrawal';
+import { getLogger } from './logger';
 
 // =============================================================================
 // Helpers
@@ -111,6 +112,14 @@ export function runProjection(
     spending_phases,
     withdrawal_strategy,
   } = scenario;
+
+  const log = getLogger();
+  log.info('Starting projection', {
+    currentAge: current_age,
+    retirementAge: retirement_age,
+    endAge: end_age,
+    detailMode: scenario.detail_mode,
+  });
 
   const timeline: TimelineRow[] = [];
 
@@ -380,6 +389,7 @@ export function runProjection(
     if (black_swan_enabled && age === black_swan_age) {
       // Override growth with the loss
       growth = -(startBalance * (black_swan_loss_pct / 100));
+      log.warn('Black swan event triggered', { age, lossPct: black_swan_loss_pct });
     } else {
       // Mid-year cash flow assumption:
       // growth = startBalance * return + netFlows * return * 0.5
@@ -397,6 +407,7 @@ export function runProjection(
     // Track shortfall before flooring
     if (endBalance < 0 && age >= retirement_age && firstShortfallAge === null) {
       firstShortfallAge = age;
+      log.warn('First shortfall detected', { age, endBalance });
     }
 
     // Near-zero depletion threshold (edge case: asymptotic drain)
@@ -407,6 +418,7 @@ export function runProjection(
       firstShortfallAge === null
     ) {
       firstShortfallAge = age;
+      log.warn('Near-zero depletion shortfall', { age, endBalance });
     }
 
     // Floor at 0 in basic mode
@@ -447,6 +459,8 @@ export function runProjection(
       shortfall_contributions: 0,
       shortfall_withdrawals: shortfallWithdrawals,
     };
+
+    log.debug('Year end', { age, end_balance: endBalance });
 
     timeline.push(row);
 
@@ -505,6 +519,13 @@ export function runProjection(
     total_taxes: totalTaxes,
     estate_value: estateValue,
   };
+
+  log.info('Projection complete', {
+    terminalReal,
+    terminalNominal,
+    shortfallAge: firstShortfallAge,
+    years: timeline.length,
+  });
 
   return { timeline, metrics };
 }

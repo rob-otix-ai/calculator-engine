@@ -1,3 +1,4 @@
+import { getLogger } from './logger';
 /**
  * Deep-clone a scenario.
  */
@@ -34,6 +35,8 @@ export function generateHeatmap(scenario, projectionFn, options) {
     const effectiveSteps = Math.max(steps, 2);
     const ageStep = (ageMax - ageMin) / (effectiveSteps - 1);
     const spendStep = (spendMax - spendMin) / (effectiveSteps - 1);
+    const log = getLogger();
+    log.info('Generating heatmap', { rows: effectiveSteps, cols: effectiveSteps });
     const cells = [];
     const desiredEstate = (_k = scenario.desired_estate) !== null && _k !== void 0 ? _k : 0;
     for (let ai = 0; ai < effectiveSteps; ai++) {
@@ -59,5 +62,7 @@ export function generateHeatmap(scenario, projectionFn, options) {
             });
         }
     }
+    const viableCells = cells.filter((c) => c.viable).length;
+    log.info('Heatmap complete', { viableCells, totalCells: cells.length });
     return cells;
 }

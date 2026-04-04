@@ -8,6 +8,7 @@
  */
 
 import type { TaxConfig } from './types';
+import { getLogger } from './logger';
 
 // =============================================================================
 // US Tax Constants (2025)
@@ -178,20 +179,31 @@ export function calculateTax(
 ): number {
   if (taxableIncome <= 0) return 0;
 
+  let taxAmount: number;
+
   switch (jurisdiction) {
     case 'Cayman Islands':
-      return 0;
+      taxAmount = 0;
+      break;
 
     case 'US':
-      return calculateUSTax(taxableIncome, config.filing_status);
+      taxAmount = calculateUSTax(taxableIncome, config.filing_status);
+      break;
 
     case 'UK':
-      return calculateUKTax(taxableIncome);
+      taxAmount = calculateUKTax(taxableIncome);
+      break;
 
     case 'Custom':
     default:
-      return taxableIncome * (config.flat_rate_pct / 100);
+      taxAmount = taxableIncome * (config.flat_rate_pct / 100);
+      break;
   }
+
+  const log = getLogger();
+  log.debug('Tax calculated', { jurisdiction, taxableIncome, taxAmount });
+
+  return taxAmount;
 }
 
 // =============================================================================

@@ -11,6 +11,7 @@
  * - GK oscillation: bounded by floor/ceiling — no special handling needed
  * - RMD override: caller responsibility (if RMD > withdrawal, caller uses RMD)
  */
+import { getLogger } from './logger';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -150,8 +151,8 @@ export function calculateAgeBandedWithdrawal(params) {
     const phase = spendingPhases.find((p) => age >= p.start_age && age <= p.end_age);
     if (!phase) {
         // Gap in spending phases — no withdrawal for this year
-        console.warn(`[withdrawal] Age-Banded: no spending phase covers age ${age}. Withdrawal defaults to $0. ` +
-            `Check for gaps in spending phase definitions.`);
+        const log = getLogger();
+        log.warn('Age-Banded gap: no spending phase covers age', { age });
         return 0;
     }
     let withdrawal;
@@ -230,6 +231,8 @@ export function calculateWithdrawal(scenario, state) {
             throw new Error(`Unknown withdrawal strategy: ${_exhaustive}`);
         }
     }
+    const log = getLogger();
+    log.debug('Withdrawal calculated', { strategy: withdrawal_strategy, amount: withdrawal });
     // Near-zero threshold: if balance after withdrawal would be below $100, treat as depleted
     const balanceAfterWithdrawal = availableBalance - withdrawal;
     const effectivelyDepleted = balanceAfterWithdrawal >= 0 && balanceAfterWithdrawal < NEAR_ZERO_THRESHOLD;

@@ -1,3 +1,4 @@
+import { getLogger } from './logger';
 // ---------------------------------------------------------------------------
 // Historical Backtest — Shiller Data (real total stock returns, 1871-2024)
 // ---------------------------------------------------------------------------
@@ -177,6 +178,7 @@ const SHILLER_DATA = [
  * @returns  Array of BacktestPeriod results and the overall success rate (0-100).
  */
 export function runHistoricalBacktest(scenario, projectionFn) {
+    const log = getLogger();
     const span = scenario.end_age - scenario.current_age;
     // Guard: span must be at least 1
     if (span < 1) {
@@ -199,6 +201,7 @@ export function runHistoricalBacktest(scenario, projectionFn) {
     for (const entry of SHILLER_DATA) {
         returnsByYear.set(entry.year, entry.realStockReturn);
     }
+    log.info('Starting backtest', { spanYears: span, windowCount });
     let survivedCount = 0;
     for (let i = 0; i < windowCount; i++) {
         const startYear = firstYear + i;
@@ -231,5 +234,6 @@ export function runHistoricalBacktest(scenario, projectionFn) {
     const successRate = periods.length > 0
         ? (survivedCount / periods.length) * 100
         : 0;
+    log.info('Backtest complete', { successRate, periodsAnalyzed: periods.length });
     return { periods, successRate };
 }
