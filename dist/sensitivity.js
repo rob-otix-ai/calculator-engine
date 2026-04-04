@@ -1,3 +1,4 @@
+import { getLogger } from './logger';
 const PARAMETERS = [
     { name: 'nominal_return_pct', label: 'Return +/-1%', delta: 1, deltaIsPct: false },
     { name: 'inflation_pct', label: 'Inflation +/-0.5%', delta: 0.5, deltaIsPct: false },
@@ -36,6 +37,9 @@ function clamp(value, min, max) {
  *   - withdrawal_pct delta is skipped when withdrawal_strategy is Age-Banded
  */
 export function runSensitivityAnalysis(scenario, projectionFn) {
+    var _a;
+    const log = getLogger();
+    log.info('Starting sensitivity analysis', { parameterCount: PARAMETERS.length });
     const factors = [];
     for (const param of PARAMETERS) {
         // Skip withdrawal_pct when strategy is Age-Banded (not applicable)
@@ -76,6 +80,13 @@ export function runSensitivityAnalysis(scenario, projectionFn) {
         const highScenario = cloneScenario(scenario);
         highScenario[param.name] = highValue;
         const highResult = projectionFn(highScenario);
+        const spread = Math.abs(highResult.metrics.terminal_real - lowResult.metrics.terminal_real);
+        log.debug('Sensitivity parameter result', {
+            name: param.name,
+            lowTerminal: lowResult.metrics.terminal_real,
+            highTerminal: highResult.metrics.terminal_real,
+            spread,
+        });
         factors.push({
             name: param.name,
             label: param.label,
@@ -83,10 +94,11 @@ export function runSensitivityAnalysis(scenario, projectionFn) {
             highValue,
             lowTerminal: lowResult.metrics.terminal_real,
             highTerminal: highResult.metrics.terminal_real,
-            spread: Math.abs(highResult.metrics.terminal_real - lowResult.metrics.terminal_real),
+            spread,
         });
     }
     // Sort by spread descending (largest impact first)
     factors.sort((a, b) => b.spread - a.spread);
+    log.info('Sensitivity complete', { topFactor: (_a = factors[0]) === null || _a === void 0 ? void 0 : _a.name });
     return factors;
 }

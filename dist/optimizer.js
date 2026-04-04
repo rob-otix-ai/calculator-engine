@@ -1,3 +1,4 @@
+import { getLogger } from './logger';
 /**
  * Deep-clone a scenario.
  */
@@ -102,11 +103,16 @@ function findMinContribution(scenario, retirementAge, projectionFn, mcFn, mcThre
  */
 export function findEarliestRetirementAge(scenario, projectionFn, mcFn, options) {
     var _a;
+    const log = getLogger();
     const mcThreshold = (_a = options === null || options === void 0 ? void 0 : options.mcThreshold) !== null && _a !== void 0 ? _a : 90;
     const results = [];
     let earliestViableAge = null;
     const startAge = scenario.current_age + 1;
     const endAge = scenario.end_age - 1;
+    log.info('Starting optimizer', {
+        searchRange: [startAge, endAge],
+        mcEnabled: mcFn != null,
+    });
     // Budget guard: track wall-clock time (50s limit per CONTRACT-005)
     const startTime = Date.now();
     const BUDGET_MS = 50000;
@@ -116,6 +122,12 @@ export function findEarliestRetirementAge(scenario, projectionFn, mcFn, options)
             break;
         }
         const { result, viable } = isViable(scenario, age, projectionFn, mcFn, mcThreshold);
+        log.debug('Optimizer candidate', {
+            age,
+            terminalReal: result.terminalReal,
+            survived: result.survived,
+            viable,
+        });
         results.push(result);
         if (viable && earliestViableAge === null) {
             earliestViableAge = age;
@@ -126,6 +138,7 @@ export function findEarliestRetirementAge(scenario, projectionFn, mcFn, options)
     if (earliestViableAge !== null) {
         minContribution = findMinContribution(scenario, earliestViableAge, projectionFn, mcFn, mcThreshold);
     }
+    log.info('Optimizer complete', { earliestViableAge, minContribution });
     return {
         results,
         earliestViableAge,

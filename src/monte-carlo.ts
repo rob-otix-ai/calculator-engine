@@ -8,6 +8,7 @@
  */
 
 import type { Scenario, TimelineRow, Metrics, FanChartRow } from './types';
+import { getLogger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,6 +150,9 @@ export function runMonteCarloSimulation(
     );
   }
 
+  const log = getLogger();
+  log.info('Starting Monte Carlo', { runs, seed, distribution: scenario.return_distribution });
+
   const rng = new SeededRNG(seed);
   const startTime = Date.now();
 
@@ -173,6 +177,7 @@ export function runMonteCarloSimulation(
       const elapsed = Date.now() - startTime;
       if (elapsed > budgetMs) {
         truncated = true;
+        log.warn('Monte Carlo truncated due to budget', { runsCompleted: run, elapsed, budgetMs });
         break;
       }
     }
@@ -245,6 +250,13 @@ export function runMonteCarloSimulation(
   // -----------------------------------------------------------------------
   const probabilityNoShortfall =
     runsCompleted > 0 ? (noShortfallCount / runsCompleted) * 100 : 0;
+
+  log.info('Monte Carlo complete', {
+    runsCompleted,
+    successProbability: probabilityNoShortfall,
+    medianTerminal: p50Terminal,
+    truncated,
+  });
 
   return {
     probability_no_shortfall: probabilityNoShortfall,

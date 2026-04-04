@@ -19,6 +19,7 @@
 import { CadenceMultiplier } from './defaults';
 import { calculateTax } from './tax';
 import { calculateWithdrawal, } from './withdrawal';
+import { getLogger } from './logger';
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -140,6 +141,12 @@ const INCOME_CATEGORIES = new Set([
 export function runAdvancedProjection(scenario, overrideReturns) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1;
     const { current_age, retirement_age, end_age, inflation_pct, inflation_enabled, financial_items, liquidity_events, enable_taxes, effective_tax_rate_pct, tax_jurisdiction, tax_config, black_swan_enabled, black_swan_age, black_swan_loss_pct, desired_estate, } = scenario;
+    const log = getLogger();
+    log.info('Starting advanced projection', {
+        currentAge: current_age,
+        retirementAge: retirement_age,
+        itemCount: financial_items.length,
+    });
     const items = financial_items.filter((item) => item.enabled);
     // -------------------------------------------------------------------------
     // Initialize state
@@ -489,7 +496,9 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                     continue;
                 // Cap at available cash
                 if (contrib > Math.max(0, cashBalance)) {
-                    shortfallContributions += contrib - Math.max(0, cashBalance);
+                    const shortfall = contrib - Math.max(0, cashBalance);
+                    log.warn('Contribution shortfall', { age, shortfall, requested: contrib, available: Math.max(0, cashBalance) });
+                    shortfallContributions += shortfall;
                     contrib = Math.max(0, cashBalance);
                 }
                 cashBalance -= contrib;
@@ -552,6 +561,9 @@ export function runAdvancedProjection(scenario, overrideReturns) {
         // 8. INSOLVENCY CHECK
         // =====================================================================
         const insolvency = cashBalance < 0;
+        if (insolvency) {
+            log.warn('Insolvency detected', { age, cashBalance });
+        }
         if (insolvency && firstShortfallAge === null) {
             firstShortfallAge = age;
         }
@@ -722,6 +734,11 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 ? Math.min(200, (totalActual / totalDesired) * 100)
                 : 100;
     }
+    const insolvencyCount = timeline.filter((r) => r.insolvency).length;
+    log.info('Advanced projection complete', {
+        terminalReal,
+        insolvencyCount,
+    });
     const metrics = {
         terminal_nominal: terminalNominal,
         terminal_real: terminalReal,

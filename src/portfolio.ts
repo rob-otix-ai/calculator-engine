@@ -1,4 +1,5 @@
 import type { Asset, FinancialItem } from './types';
+import { getLogger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Portfolio Blending (Basic Mode)
@@ -75,6 +76,13 @@ export function blendPortfolio(assets: Asset[]): BlendedPortfolio {
     .reduce((sum, a) => sum + a.current_value, 0);
 
   const liquidPct = (liquidTotal / totalValue) * 100;
+
+  const log = getLogger();
+  log.debug('Portfolio blended', {
+    assetCount: enabled.length,
+    blendedReturn,
+    liquidPct,
+  });
 
   return {
     totalValue,

@@ -6,6 +6,7 @@
  *
  * Also includes RMD (Required Minimum Distribution) and Roth conversion logic.
  */
+import { getLogger } from './logger';
 const US_STANDARD_DEDUCTION_SINGLE = 15000;
 const US_STANDARD_DEDUCTION_MFJ = 30000;
 const US_BRACKETS_2025_SINGLE = [
@@ -136,17 +137,25 @@ function calculateUKTax(grossIncome) {
 export function calculateTax(taxableIncome, config, jurisdiction) {
     if (taxableIncome <= 0)
         return 0;
+    let taxAmount;
     switch (jurisdiction) {
         case 'Cayman Islands':
-            return 0;
+            taxAmount = 0;
+            break;
         case 'US':
-            return calculateUSTax(taxableIncome, config.filing_status);
+            taxAmount = calculateUSTax(taxableIncome, config.filing_status);
+            break;
         case 'UK':
-            return calculateUKTax(taxableIncome);
+            taxAmount = calculateUKTax(taxableIncome);
+            break;
         case 'Custom':
         default:
-            return taxableIncome * (config.flat_rate_pct / 100);
+            taxAmount = taxableIncome * (config.flat_rate_pct / 100);
+            break;
     }
+    const log = getLogger();
+    log.debug('Tax calculated', { jurisdiction, taxableIncome, taxAmount });
+    return taxAmount;
 }
 // =============================================================================
 // RMD (Required Minimum Distributions)

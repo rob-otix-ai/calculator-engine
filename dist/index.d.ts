@@ -8,4 +8,5 @@ export { runHistoricalBacktest, type BacktestPeriod, type BacktestResult, } from
 export { findEarliestRetirementAge, type OptimizerResult, type OptimizerOutput, type OptimizerOptions, } from './optimizer';
 export { generateHeatmap, type HeatmapCell, type HeatmapOptions, } from './heatmap';
 export { blendPortfolio, calculateEstateValue, type BlendedPortfolio, } from './portfolio';
+export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';
 //# sourceMappingURL=index.d.ts.map

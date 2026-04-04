@@ -17,3 +17,5 @@ export { findEarliestRetirementAge, } from './optimizer';
 export { generateHeatmap, } from './heatmap';
 // Portfolio blending & estate value
 export { blendPortfolio, calculateEstateValue, } from './portfolio';
+// Logger utilities
+export { getLogger, setLogLevel, setLogger } from './logger';

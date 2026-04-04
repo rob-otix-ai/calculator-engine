@@ -6,6 +6,7 @@
  * a caller-provided projection function, keeping MC fully decoupled from the
  * projection engine.
  */
+import { getLogger } from './logger';
 // ---------------------------------------------------------------------------
 // SeededRNG — Deterministic PRNG (mulberry32)
 // ---------------------------------------------------------------------------
@@ -88,6 +89,8 @@ export function runMonteCarloSimulation(scenario, projectionFn, options = {}) {
     if (runs < 100 || runs > 10000) {
         throw new Error(`mc_runs must be 0 (disabled) or between 100 and 10000. Got: ${runs}`);
     }
+    const log = getLogger();
+    log.info('Starting Monte Carlo', { runs, seed, distribution: scenario.return_distribution });
     const rng = new SeededRNG(seed);
     const startTime = Date.now();
     const numYears = scenario.end_age - scenario.current_age;
@@ -108,6 +111,7 @@ export function runMonteCarloSimulation(scenario, projectionFn, options = {}) {
             const elapsed = Date.now() - startTime;
             if (elapsed > budgetMs) {
                 truncated = true;
+                log.warn('Monte Carlo truncated due to budget', { runsCompleted: run, elapsed, budgetMs });
                 break;
             }
         }
@@ -165,6 +169,12 @@ export function runMonteCarloSimulation(scenario, projectionFn, options = {}) {
     // Compute probability of no shortfall
     // -----------------------------------------------------------------------
     const probabilityNoShortfall = runsCompleted > 0 ? (noShortfallCount / runsCompleted) * 100 : 0;
+    log.info('Monte Carlo complete', {
+        runsCompleted,
+        successProbability: probabilityNoShortfall,
+        medianTerminal: p50Terminal,
+        truncated,
+    });
     return {
         probability_no_shortfall: probabilityNoShortfall,
         median_terminal: p50Terminal,

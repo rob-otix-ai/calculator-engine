@@ -1,4 +1,5 @@
 import type { Scenario, Metrics } from './types';
+import { getLogger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Retirement Age Optimizer
@@ -152,12 +153,18 @@ export function findEarliestRetirementAge(
   mcFn?: (s: Scenario) => { probability_no_shortfall: number },
   options?: OptimizerOptions,
 ): OptimizerOutput {
+  const log = getLogger();
   const mcThreshold = options?.mcThreshold ?? 90;
   const results: OptimizerResult[] = [];
   let earliestViableAge: number | null = null;
 
   const startAge = scenario.current_age + 1;
   const endAge = scenario.end_age - 1;
+
+  log.info('Starting optimizer', {
+    searchRange: [startAge, endAge],
+    mcEnabled: mcFn != null,
+  });
 
   // Budget guard: track wall-clock time (50s limit per CONTRACT-005)
   const startTime = Date.now();
@@ -177,6 +184,13 @@ export function findEarliestRetirementAge(
       mcThreshold,
     );
 
+    log.debug('Optimizer candidate', {
+      age,
+      terminalReal: result.terminalReal,
+      survived: result.survived,
+      viable,
+    });
+
     results.push(result);
 
     if (viable && earliestViableAge === null) {
@@ -195,6 +209,8 @@ export function findEarliestRetirementAge(
       mcThreshold,
     );
   }
+
+  log.info('Optimizer complete', { earliestViableAge, minContribution });
 
   return {
     results,

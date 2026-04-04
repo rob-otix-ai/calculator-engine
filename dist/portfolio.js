@@ -1,3 +1,4 @@
+import { getLogger } from './logger';
 /**
  * Computes weighted-average return, fee, perf-fee, and liquid percentage
  * across a set of basic-mode assets.
@@ -44,6 +45,12 @@ export function blendPortfolio(assets) {
         .filter((a) => a.is_liquid)
         .reduce((sum, a) => sum + a.current_value, 0);
     const liquidPct = (liquidTotal / totalValue) * 100;
+    const log = getLogger();
+    log.debug('Portfolio blended', {
+        assetCount: enabled.length,
+        blendedReturn,
+        liquidPct,
+    });
     return {
         totalValue,
         blendedReturn,

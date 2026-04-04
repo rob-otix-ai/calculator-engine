@@ -11,6 +11,7 @@
 import { CadenceMultiplier } from './defaults';
 import { calculateTax, getRMDAmount, calculateRothConversion } from './tax';
 import { calculateWithdrawal, NEAR_ZERO_THRESHOLD, } from './withdrawal';
+import { getLogger } from './logger';
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -57,6 +58,13 @@ export function runProjection(scenario, overrideReturns) {
     const { current_age, retirement_age, end_age, current_balance, contrib_amount, contrib_cadence, contrib_increase_pct, nominal_return_pct, inflation_pct, inflation_enabled, fee_pct, perf_fee_pct, enable_taxes, effective_tax_rate_pct, tax_jurisdiction, tax_config, tax_deferred_pct, planning_mode, partner_current_age, partner_income_sources, income_sources, liquidity_events, 
     // assets — not used in basic-mode projection (estate_pct is advanced-mode only)
     black_swan_enabled, black_swan_age, black_swan_loss_pct, spending_phases, withdrawal_strategy, } = scenario;
+    const log = getLogger();
+    log.info('Starting projection', {
+        currentAge: current_age,
+        retirementAge: retirement_age,
+        endAge: end_age,
+        detailMode: scenario.detail_mode,
+    });
     const timeline = [];
     // Running state
     let prevEndBalance = current_balance;
@@ -271,6 +279,7 @@ export function runProjection(scenario, overrideReturns) {
         if (black_swan_enabled && age === black_swan_age) {
             // Override growth with the loss
             growth = -(startBalance * (black_swan_loss_pct / 100));
+            log.warn('Black swan event triggered', { age, lossPct: black_swan_loss_pct });
         }
         else {
             // Mid-year cash flow assumption:
@@ -286,6 +295,7 @@ export function runProjection(scenario, overrideReturns) {
         // Track shortfall before flooring
         if (endBalance < 0 && age >= retirement_age && firstShortfallAge === null) {
             firstShortfallAge = age;
+            log.warn('First shortfall detected', { age, endBalance });
         }
         // Near-zero depletion threshold (edge case: asymptotic drain)
         if (endBalance >= 0 &&
@@ -293,6 +303,7 @@ export function runProjection(scenario, overrideReturns) {
             age >= retirement_age &&
             firstShortfallAge === null) {
             firstShortfallAge = age;
+            log.warn('Near-zero depletion shortfall', { age, endBalance });
         }
         // Floor at 0 in basic mode
         endBalance = Math.max(endBalance, 0);
@@ -330,6 +341,7 @@ export function runProjection(scenario, overrideReturns) {
             shortfall_contributions: 0,
             shortfall_withdrawals: shortfallWithdrawals,
         };
+        log.debug('Year end', { age, end_balance: endBalance });
         timeline.push(row);
         // Update running state for next year
         prevEndBalance = endBalance;
@@ -378,5 +390,11 @@ export function runProjection(scenario, overrideReturns) {
         total_taxes: totalTaxes,
         estate_value: estateValue,
     };
+    log.info('Projection complete', {
+        terminalReal,
+        terminalNominal,
+        shortfallAge: firstShortfallAge,
+        years: timeline.length,
+    });
     return { timeline, metrics };
 }
