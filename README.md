@@ -1,4 +1,4 @@
-# @rob-otixai/calculator-engine
+# @robotixai/calculator-engine
 
 Financial retirement projection engine with Monte Carlo simulation.
 
@@ -18,7 +18,7 @@ Financial retirement projection engine with Monte Carlo simulation.
 ## Installation
 
 ```bash
-npm install @rob-otixai/calculator-engine
+npm install @robotixai/calculator-engine
 ```
 
 No peer dependencies required. All types and defaults are included in the package.
@@ -26,7 +26,7 @@ No peer dependencies required. All types and defaults are included in the packag
 ## Quick Start
 
 ```typescript
-import { runProjection, runMonteCarloSimulation, DEFAULT_SCENARIO } from '@rob-otixai/calculator-engine';
+import { runProjection, runMonteCarloSimulation, DEFAULT_SCENARIO } from '@robotixai/calculator-engine';
 
 // Deterministic projection
 const { timeline, metrics } = runProjection(DEFAULT_SCENARIO);

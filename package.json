@@ -1,5 +1,5 @@
 {
-  "name": "@rob-otixai/calculator-engine",
+  "name": "@robotixai/calculator-engine",
   "version": "0.1.0",
   "description": "Financial retirement projection engine with Monte Carlo simulation, multi-jurisdiction tax, and withdrawal strategies",
   "private": false,
