@@ -1,0 +1,33 @@
+{
+  "name": "@rob-otixai/calculator-engine",
+  "version": "0.1.0",
+  "description": "Financial retirement projection engine with Monte Carlo simulation, multi-jurisdiction tax, and withdrawal strategies",
+  "private": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  },
+  "keywords": [
+    "retirement", "calculator", "monte-carlo", "financial-planning",
+    "projection", "tax", "withdrawal-strategies", "guyton-klinger"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fall-development-rob/shore-crest-education"
+  }
+}
