@@ -10,6 +10,24 @@ export const CadenceMultiplier = {
     'Bi-Weekly': 26,
     Weekly: 52,
 };
+export const CURRENCY_MAP = {
+    USD: { code: 'USD', symbol: '$', decimals: 2 },
+    EUR: { code: 'EUR', symbol: '€', decimals: 2 },
+    GBP: { code: 'GBP', symbol: '£', decimals: 2 },
+    CHF: { code: 'CHF', symbol: 'CHF', decimals: 2 },
+    HKD: { code: 'HKD', symbol: 'HK$', decimals: 2 },
+    SGD: { code: 'SGD', symbol: 'S$', decimals: 2 },
+    AED: { code: 'AED', symbol: 'د.إ', decimals: 2 },
+    JPY: { code: 'JPY', symbol: '¥', decimals: 0 },
+    CAD: { code: 'CAD', symbol: 'C$', decimals: 2 },
+    AUD: { code: 'AUD', symbol: 'A$', decimals: 2 },
+    NZD: { code: 'NZD', symbol: 'NZ$', decimals: 2 },
+    ZAR: { code: 'ZAR', symbol: 'R', decimals: 2 },
+    INR: { code: 'INR', symbol: '₹', decimals: 2 },
+    BRL: { code: 'BRL', symbol: 'R$', decimals: 2 },
+    MXN: { code: 'MXN', symbol: 'Mex$', decimals: 2 },
+    KYD: { code: 'KYD', symbol: 'CI$', decimals: 2 },
+};
 // ---------------------------------------------------------------------------
 // Default Scenario
 // ---------------------------------------------------------------------------

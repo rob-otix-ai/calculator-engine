@@ -1,6 +1,6 @@
 {
   "name": "@robotixai/calculator-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Financial retirement projection engine with Monte Carlo simulation, multi-jurisdiction tax, and withdrawal strategies",
   "private": false,
   "main": "./dist/index.js",

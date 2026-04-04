@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Engine — barrel export
 // ---------------------------------------------------------------------------
-export { CadenceMultiplier, DEFAULT_SCENARIO } from './defaults';
+export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO } from './defaults';
 // Deterministic projection (basic & advanced)
 export { runProjection } from './projection';
 export { runAdvancedProjection } from './advanced';

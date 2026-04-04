@@ -26,7 +26,7 @@ export type {
   Metrics,
 } from './types';
 
-export { CadenceMultiplier, DEFAULT_SCENARIO } from './defaults';
+export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
 
 // Deterministic projection (basic & advanced)
 export { runProjection } from './projection';
