@@ -1,7 +1,7 @@
 /**
  * Withdrawal Strategy Implementations
  *
- * Three strategies: Standard, Guyton-Klinger, Age-Banded.
+ * Four strategies: Standard, Guyton-Klinger, Age-Banded, Fixed-Pct.
  * Dispatched via calculateWithdrawal() based on scenario.withdrawal_strategy.
  *
  * Edge cases handled:
@@ -11,7 +11,7 @@
  * - GK oscillation: bounded by floor/ceiling — no special handling needed
  * - RMD override: caller responsibility (if RMD > withdrawal, caller uses RMD)
  */
-import type { Scenario, SpendingPhase } from './types';
+import type { Scenario, SpendingPhase, WithdrawalEvent } from './types';
 /** Balance below this threshold is treated as depleted (prevents asymptotic depletion). */
 export declare const NEAR_ZERO_THRESHOLD = 100;
 export interface GKState {
@@ -52,6 +52,14 @@ export interface AgeBandedWithdrawalParams {
     spendingPhases: SpendingPhase[];
     cpiIndex: number;
 }
+export interface FixedPctWithdrawalParams {
+    /** Withdrawal percentage applied to the prior-year end balance (e.g. 4 for 4%). */
+    fixed_withdrawal_pct: number;
+    /** Prior-year end balance (nominal). */
+    priorEndBalance: number;
+    /** Available balance — withdrawal is capped at this value. */
+    availableBalance?: number;
+}
 /**
  * Calculate withdrawal using the Standard strategy.
  *
@@ -91,6 +99,7 @@ export declare function calculateStandardWithdrawal(params: StandardWithdrawalPa
 export declare function calculateGuytonKlingerWithdrawal(params: GuytonKlingerWithdrawalParams): {
     withdrawal: number;
     gkState: GKState;
+    event?: 'cut' | 'raise';
 };
 /**
  * Calculate withdrawal using the Age-Banded strategy.
@@ -101,8 +110,24 @@ export declare function calculateGuytonKlingerWithdrawal(params: GuytonKlingerWi
  *
  * If no phase covers the current age, returns 0 and logs a warning (gap).
  * If phases overlap, the first match wins (Array.find behavior).
+ *
+ * Returns both the withdrawal amount and whether a band matched, so callers
+ * can tag the resulting TimelineRow with a `band` withdrawal_event.
  */
-export declare function calculateAgeBandedWithdrawal(params: AgeBandedWithdrawalParams): number;
+export declare function calculateAgeBandedWithdrawal(params: AgeBandedWithdrawalParams): {
+    withdrawal: number;
+    matched: boolean;
+};
+/**
+ * Calculate withdrawal using the Fixed-Pct strategy.
+ *
+ *   withdrawal = priorEndBalance * (fixed_withdrawal_pct / 100)
+ *
+ * Result is clamped to >= 0, and (if availableBalance is supplied) capped at
+ * the available balance. Per CONTRACT-016 there is no event tag for this
+ * strategy — the dispatcher will record `withdrawal_event = 'standard'`.
+ */
+export declare function calculateFixedPctWithdrawal(params: FixedPctWithdrawalParams): number;
 /** Parameters for the main dispatcher, combining scenario config and simulation state. */
 export interface WithdrawalParams {
     /** The full scenario configuration. */
@@ -125,12 +150,22 @@ export interface WithdrawalResult {
     gkState?: GKState;
     /** True if the balance is below the near-zero threshold post-withdrawal. */
     effectivelyDepleted: boolean;
+    /**
+     * Tag indicating which strategy event produced this year's withdrawal.
+     * Used by callers to populate TimelineRow.withdrawal_event.
+     */
+    event: WithdrawalEvent;
 }
 /**
  * Main withdrawal dispatcher.
  *
  * Routes to the correct strategy based on scenario.withdrawal_strategy, then
  * applies the near-zero depletion threshold ($100).
+ *
+ * Maps the new CONTRACT-016 Guyton-Klinger field names
+ * (`guyton_guard_up_pct`, `guyton_guard_down_pct`, `guyton_cut_pct`,
+ * `guyton_raise_pct`) onto the engine's existing `gk_*` internals when
+ * supplied, falling back to the legacy values otherwise.
  */
 export declare function calculateWithdrawal(scenario: Scenario, state: WithdrawalParams['state']): WithdrawalResult;
 //# sourceMappingURL=withdrawal.d.ts.map

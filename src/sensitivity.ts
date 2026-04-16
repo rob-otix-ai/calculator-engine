@@ -111,11 +111,15 @@ export function runSensitivityAnalysis(
     // Run projection with low value
     const lowScenario = cloneScenario(scenario);
     (lowScenario as Record<string, unknown>)[param.name] = lowValue;
+    // ADR-027: sensitivity must always exclude the Black Swan stress event so
+    // bands are interpretable in isolation.
+    lowScenario.black_swan_enabled = false;
     const lowResult = projectionFn(lowScenario);
 
     // Run projection with high value
     const highScenario = cloneScenario(scenario);
     (highScenario as Record<string, unknown>)[param.name] = highValue;
+    highScenario.black_swan_enabled = false;
     const highResult = projectionFn(highScenario);
 
     const spread = Math.abs(highResult.metrics.terminal_real - lowResult.metrics.terminal_real);

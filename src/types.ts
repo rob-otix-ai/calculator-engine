@@ -262,13 +262,27 @@ export interface Scenario {
   withdrawal_pct: number;
   withdrawal_real_amount: number;
   withdrawal_frequency: 'Annual' | 'Monthly';
-  withdrawal_strategy: 'Standard' | 'Guyton-Klinger' | 'Age-Banded';
+  withdrawal_strategy: 'Standard' | 'Guyton-Klinger' | 'Age-Banded' | 'Fixed-Pct';
 
-  // Guyton-Klinger guardrails
+  // Guyton-Klinger guardrails (legacy engine field names; still authoritative
+  // internally — the new CONTRACT-016 names below map onto these via the
+  // dispatcher).
   gk_ceiling_pct: number;
   gk_floor_pct: number;
   gk_prosperity_threshold: number;
   gk_capital_preservation_threshold: number;
+
+  // CONTRACT-016 / ADR-026 Guyton-Klinger parameter names (new schema).
+  // All defaulted; the dispatcher prefers these when present, otherwise it
+  // falls back to the gk_* legacy fields.
+  guyton_guard_up_pct?: number;
+  guyton_guard_down_pct?: number;
+  guyton_cut_pct?: number;
+  guyton_raise_pct?: number;
+  guyton_max_cut_per_year_pct?: number;
+
+  // Fixed-Pct withdrawal strategy parameter (CONTRACT-016 / ADR-026)
+  fixed_withdrawal_pct?: number;
 
   // Spending phases (Age-Banded)
   spending_phases: SpendingPhase[];
@@ -325,6 +339,15 @@ export interface Scenario {
 // Output Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Tag indicating which strategy event produced this year's withdrawal.
+ *  - 'standard': default (no special event)
+ *  - 'cut'    : Guyton-Klinger capital preservation rule fired (withdrawal cut)
+ *  - 'raise'  : Guyton-Klinger prosperity rule fired (withdrawal raised)
+ *  - 'band'   : Age-Banded strategy matched a configured spending phase
+ */
+export type WithdrawalEvent = 'standard' | 'cut' | 'raise' | 'band';
+
 export interface TimelineRow {
   age: number;
   start_balance_nominal: number;
@@ -353,6 +376,12 @@ export interface TimelineRow {
   shortfall_mandatory: number;
   shortfall_contributions: number;
   shortfall_withdrawals: number;
+
+  // CONTRACT-016 / ADR-027 additions
+  /** Nominal-dollar loss applied by the Black Swan stress event in this year. Zero in non-shock years. */
+  black_swan_loss: number;
+  /** Tag indicating which strategy event produced this year's withdrawal. */
+  withdrawal_event: WithdrawalEvent;
 }
 
 export interface FanChartRow {

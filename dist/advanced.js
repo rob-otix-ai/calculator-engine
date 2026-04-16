@@ -221,6 +221,8 @@ export function runAdvancedProjection(scenario, overrideReturns) {
         let shortfallContributions = 0;
         let shortfallWithdrawals = 0;
         let yearTaxableIncome = 0;
+        let yearBlackSwanLoss = 0;
+        let withdrawalEvent = 'standard';
         // =====================================================================
         // 1. INCOME PHASE
         // =====================================================================
@@ -527,6 +529,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             if (withdrawalResult.gkState) {
                 gkState = withdrawalResult.gkState;
             }
+            withdrawalEvent = withdrawalResult.event;
             const desiredWithdrawal = withdrawalResult.withdrawal;
             yearDesiredSpending = desiredWithdrawal;
             // Withdraw from cash first
@@ -585,6 +588,10 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             // Apply black swan
             if (blackSwanActive) {
                 returnRate -= black_swan_loss_pct / 100;
+                // Track the nominal-dollar loss attributable to the shock for this
+                // item. The shock applies on top of normal returns, so the marginal
+                // loss is balance * (loss_pct / 100).
+                yearBlackSwanLoss += balance * (black_swan_loss_pct / 100);
             }
             const grossReturn = balance * returnRate;
             // Management fee
@@ -617,8 +624,13 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             if (item.purchase_age != null && age < item.purchase_age)
                 continue;
             let growthRate = item.rate_pct / 100;
-            if (blackSwanActive) {
+            if (blackSwanActive && item.is_liquid) {
+                // ADR-027: in advanced mode the shock applies only to liquid
+                // investment items (Cash, illiquid Property/Collectables, and
+                // income-producing items are exempt). Properties/Collectables that
+                // happen to be marked liquid (rare but possible) participate.
                 growthRate -= black_swan_loss_pct / 100;
+                yearBlackSwanLoss += value * (black_swan_loss_pct / 100);
             }
             const appreciation = value * growthRate;
             propertyValues.set(idx, value + appreciation);
@@ -691,6 +703,8 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             shortfall_mandatory: shortfallMandatory,
             shortfall_contributions: shortfallContributions,
             shortfall_withdrawals: shortfallWithdrawals,
+            black_swan_loss: yearBlackSwanLoss,
+            withdrawal_event: withdrawalEvent,
         };
         timeline.push(row);
     }

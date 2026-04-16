@@ -249,8 +249,14 @@ export function runHistoricalBacktest(
     // If we didn't get enough years (shouldn't happen given windowCount calc), skip
     if (returns.length < span) continue;
 
+    // ADR-027: backtests already include real historical crashes — layering a
+    // synthetic Black Swan event would double-count. Force-disable it on a
+    // per-window scenario clone.
+    const periodScenario: Scenario = JSON.parse(JSON.stringify(scenario));
+    periodScenario.black_swan_enabled = false;
+
     // Run projection with historical returns
-    const result = projectionFn(scenario, returns);
+    const result = projectionFn(periodScenario, returns);
 
     // Balance floor at 0 (CONTRACT-005 invariant)
     const terminalReal = Math.max(0, result.metrics.terminal_real);

@@ -78,11 +78,21 @@ export const DEFAULT_SCENARIO: Scenario = {
   withdrawal_frequency: 'Annual',
   withdrawal_strategy: 'Standard',
 
-  // Guyton-Klinger
+  // Guyton-Klinger (legacy engine field names)
   gk_ceiling_pct: 20,
   gk_floor_pct: 20,
   gk_prosperity_threshold: 20,
   gk_capital_preservation_threshold: 20,
+
+  // Guyton-Klinger (CONTRACT-016 / ADR-026 field names — defaults match Shorecrest)
+  guyton_guard_up_pct: 20,
+  guyton_guard_down_pct: 20,
+  guyton_cut_pct: 10,
+  guyton_raise_pct: 10,
+  guyton_max_cut_per_year_pct: 10,
+
+  // Fixed-Pct strategy default (CONTRACT-016 / ADR-026)
+  fixed_withdrawal_pct: 4,
 
   // Spending phases
   spending_phases: [],
