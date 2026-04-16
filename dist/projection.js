@@ -30,13 +30,18 @@ function estimateBirthYear(currentAge) {
  * the actual withdrawal so the ratio is 1:1 (capped at 200 by spec).
  */
 function computeDesiredSpending(scenario, priorEndBalance, cpiIndex) {
-    const { withdrawal_method, withdrawal_pct, withdrawal_real_amount, withdrawal_frequency, withdrawal_strategy, spending_phases, } = scenario;
+    const { withdrawal_method, withdrawal_pct, withdrawal_real_amount, withdrawal_frequency, withdrawal_strategy, fixed_withdrawal_pct, } = scenario;
     // Age-Banded has its own target (handled elsewhere), but for Standard / GK
     // the desired amount before capping is what matters.
     if (withdrawal_strategy === 'Age-Banded') {
         // For age-banded the "desired" equals the phase amount — we compute this
         // in the main loop where we know the age.
         return 0; // sentinel — caller overrides
+    }
+    // Fixed-Pct: the desired amount is simply pct * prior-year end balance.
+    if (withdrawal_strategy === 'Fixed-Pct') {
+        const pct = fixed_withdrawal_pct !== null && fixed_withdrawal_pct !== void 0 ? fixed_withdrawal_pct : 4;
+        return Math.max(0, priorEndBalance * (pct / 100));
     }
     let desired;
     if (withdrawal_method === 'Fixed % of prior-year end balance') {
@@ -187,6 +192,7 @@ export function runProjection(scenario, overrideReturns) {
         let withdrawal = 0;
         let desiredSpending = 0;
         let shortfallWithdrawals = 0;
+        let withdrawalEvent = 'standard';
         if (age >= retirement_age) {
             // Available balance for withdrawal cap
             const availableBalance = Math.max(0, startBalance + contributions + netIncome + liquidityNet);
@@ -216,6 +222,7 @@ export function runProjection(scenario, overrideReturns) {
                 gkState,
             });
             withdrawal = wResult.withdrawal;
+            withdrawalEvent = wResult.event;
             if (wResult.gkState) {
                 gkState = wResult.gkState;
             }
@@ -273,12 +280,14 @@ export function runProjection(scenario, overrideReturns) {
         // ------------------------------------------------------------------
         const netFlows = contributions + netIncome + liquidityNet - withdrawal - fees - taxes;
         let growth;
+        let blackSwanLoss = 0;
         // ------------------------------------------------------------------
         // 10. BLACK SWAN
         // ------------------------------------------------------------------
         if (black_swan_enabled && age === black_swan_age) {
             // Override growth with the loss
-            growth = -(startBalance * (black_swan_loss_pct / 100));
+            blackSwanLoss = startBalance * (black_swan_loss_pct / 100);
+            growth = -blackSwanLoss;
             log.warn('Black swan event triggered', { age, lossPct: black_swan_loss_pct });
         }
         else {
@@ -340,6 +349,8 @@ export function runProjection(scenario, overrideReturns) {
             shortfall_mandatory: 0,
             shortfall_contributions: 0,
             shortfall_withdrawals: shortfallWithdrawals,
+            black_swan_loss: blackSwanLoss,
+            withdrawal_event: withdrawalEvent,
         };
         log.debug('Year end', { age, end_balance: endBalance });
         timeline.push(row);

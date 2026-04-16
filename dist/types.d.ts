@@ -167,11 +167,17 @@ export interface Scenario {
     withdrawal_pct: number;
     withdrawal_real_amount: number;
     withdrawal_frequency: 'Annual' | 'Monthly';
-    withdrawal_strategy: 'Standard' | 'Guyton-Klinger' | 'Age-Banded';
+    withdrawal_strategy: 'Standard' | 'Guyton-Klinger' | 'Age-Banded' | 'Fixed-Pct';
     gk_ceiling_pct: number;
     gk_floor_pct: number;
     gk_prosperity_threshold: number;
     gk_capital_preservation_threshold: number;
+    guyton_guard_up_pct?: number;
+    guyton_guard_down_pct?: number;
+    guyton_cut_pct?: number;
+    guyton_raise_pct?: number;
+    guyton_max_cut_per_year_pct?: number;
+    fixed_withdrawal_pct?: number;
     spending_phases: SpendingPhase[];
     enable_mc: boolean;
     mc_runs: number;
@@ -199,6 +205,14 @@ export interface Scenario {
     currency_symbol: string;
     withdrawal_order: string;
 }
+/**
+ * Tag indicating which strategy event produced this year's withdrawal.
+ *  - 'standard': default (no special event)
+ *  - 'cut'    : Guyton-Klinger capital preservation rule fired (withdrawal cut)
+ *  - 'raise'  : Guyton-Klinger prosperity rule fired (withdrawal raised)
+ *  - 'band'   : Age-Banded strategy matched a configured spending phase
+ */
+export type WithdrawalEvent = 'standard' | 'cut' | 'raise' | 'band';
 export interface TimelineRow {
     age: number;
     start_balance_nominal: number;
@@ -227,6 +241,10 @@ export interface TimelineRow {
     shortfall_mandatory: number;
     shortfall_contributions: number;
     shortfall_withdrawals: number;
+    /** Nominal-dollar loss applied by the Black Swan stress event in this year. Zero in non-shock years. */
+    black_swan_loss: number;
+    /** Tag indicating which strategy event produced this year's withdrawal. */
+    withdrawal_event: WithdrawalEvent;
 }
 export interface FanChartRow {
     age: number;

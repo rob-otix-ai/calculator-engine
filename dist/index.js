@@ -13,6 +13,11 @@ export { runSensitivityAnalysis, } from './sensitivity';
 export { runHistoricalBacktest, } from './backtest';
 // Retirement age optimizer
 export { findEarliestRetirementAge, } from './optimizer';
+// Required-savings reverse solver (CONTRACT-016 / ADR-025)
+export { findRequiredSavings, } from './required-savings';
+// Withdrawal strategy primitives (CONTRACT-016 / ADR-026) — exported so the
+// app can call individual strategies for comparison views.
+export { calculateWithdrawal, calculateStandardWithdrawal, calculateGuytonKlingerWithdrawal, calculateAgeBandedWithdrawal, calculateFixedPctWithdrawal, } from './withdrawal';
 // Retirement age x spending heatmap
 export { generateHeatmap, } from './heatmap';
 // Portfolio blending & estate value

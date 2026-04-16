@@ -1,7 +1,7 @@
 /**
  * Withdrawal Strategy Implementations
  *
- * Three strategies: Standard, Guyton-Klinger, Age-Banded.
+ * Four strategies: Standard, Guyton-Klinger, Age-Banded, Fixed-Pct.
  * Dispatched via calculateWithdrawal() based on scenario.withdrawal_strategy.
  *
  * Edge cases handled:
@@ -90,6 +90,7 @@ export function calculateGuytonKlingerWithdrawal(params) {
                 initialRate,
                 priorWithdrawal: cappedWithdrawal,
             },
+            // No event in the seed year — falls back to 'standard' in the dispatcher.
         };
     }
     // --- Subsequent years ---
@@ -107,15 +108,18 @@ export function calculateGuytonKlingerWithdrawal(params) {
     }
     const currentRate = (priorWithdrawal / currentBalance) * 100;
     let withdrawal = priorWithdrawal;
+    let event;
     // Prosperity rule: balance grew enough that the rate dropped below threshold
     const prosperityBound = initialRate * (1 - gkProsperityThreshold / 100);
     if (currentRate < prosperityBound) {
         withdrawal = priorWithdrawal * 1.1;
+        event = 'raise';
     }
     // Capital preservation rule: balance dropped enough that the rate exceeded threshold
     const preservationBound = initialRate * (1 + gkCapitalPreservationThreshold / 100);
     if (currentRate > preservationBound) {
         withdrawal = priorWithdrawal * 0.9;
+        event = 'cut';
     }
     // Hard limits (ceiling and floor relative to initial withdrawal)
     const maxWithdrawal = initialWithdrawal * (1 + gkCeilingPct / 100);
@@ -130,6 +134,7 @@ export function calculateGuytonKlingerWithdrawal(params) {
             initialRate,
             priorWithdrawal: cappedWithdrawal,
         },
+        event,
     };
 }
 // ---------------------------------------------------------------------------
@@ -144,6 +149,9 @@ export function calculateGuytonKlingerWithdrawal(params) {
  *
  * If no phase covers the current age, returns 0 and logs a warning (gap).
  * If phases overlap, the first match wins (Array.find behavior).
+ *
+ * Returns both the withdrawal amount and whether a band matched, so callers
+ * can tag the resulting TimelineRow with a `band` withdrawal_event.
  */
 export function calculateAgeBandedWithdrawal(params) {
     const { age, currentBalance, availableBalance, spendingPhases, cpiIndex } = params;
@@ -153,7 +161,7 @@ export function calculateAgeBandedWithdrawal(params) {
         // Gap in spending phases — no withdrawal for this year
         const log = getLogger();
         log.warn('Age-Banded gap: no spending phase covers age', { age });
-        return 0;
+        return { withdrawal: 0, matched: false };
     }
     let withdrawal;
     if (phase.mode === 'percent') {
@@ -164,16 +172,44 @@ export function calculateAgeBandedWithdrawal(params) {
         withdrawal = phase.amount * cpiIndex;
     }
     // Cap at available balance
-    return Math.min(withdrawal, Math.max(0, availableBalance));
+    return {
+        withdrawal: Math.min(withdrawal, Math.max(0, availableBalance)),
+        matched: true,
+    };
+}
+// ---------------------------------------------------------------------------
+// 4. Fixed-Pct Withdrawal (CONTRACT-016 / ADR-026)
+// ---------------------------------------------------------------------------
+/**
+ * Calculate withdrawal using the Fixed-Pct strategy.
+ *
+ *   withdrawal = priorEndBalance * (fixed_withdrawal_pct / 100)
+ *
+ * Result is clamped to >= 0, and (if availableBalance is supplied) capped at
+ * the available balance. Per CONTRACT-016 there is no event tag for this
+ * strategy — the dispatcher will record `withdrawal_event = 'standard'`.
+ */
+export function calculateFixedPctWithdrawal(params) {
+    const { fixed_withdrawal_pct, priorEndBalance, availableBalance } = params;
+    const raw = priorEndBalance * (fixed_withdrawal_pct / 100);
+    const clamped = Math.max(0, raw);
+    if (availableBalance == null)
+        return clamped;
+    return Math.min(clamped, Math.max(0, availableBalance));
 }
 /**
  * Main withdrawal dispatcher.
  *
  * Routes to the correct strategy based on scenario.withdrawal_strategy, then
  * applies the near-zero depletion threshold ($100).
+ *
+ * Maps the new CONTRACT-016 Guyton-Klinger field names
+ * (`guyton_guard_up_pct`, `guyton_guard_down_pct`, `guyton_cut_pct`,
+ * `guyton_raise_pct`) onto the engine's existing `gk_*` internals when
+ * supplied, falling back to the legacy values otherwise.
  */
 export function calculateWithdrawal(scenario, state) {
-    const { withdrawal_strategy, withdrawal_method, withdrawal_pct, withdrawal_real_amount, withdrawal_frequency, gk_ceiling_pct, gk_floor_pct, gk_prosperity_threshold, gk_capital_preservation_threshold, spending_phases, } = scenario;
+    const { withdrawal_strategy, withdrawal_method, withdrawal_pct, withdrawal_real_amount, withdrawal_frequency, gk_ceiling_pct, gk_floor_pct, gk_prosperity_threshold, gk_capital_preservation_threshold, guyton_guard_up_pct, guyton_guard_down_pct, spending_phases, fixed_withdrawal_pct, } = scenario;
     const { age, currentBalance, priorEndBalance, availableBalance, cpiIndex, gkState } = state;
     // Check near-zero threshold before computing — if already depleted, no withdrawal
     if (currentBalance < NEAR_ZERO_THRESHOLD && currentBalance >= 0) {
@@ -181,6 +217,7 @@ export function calculateWithdrawal(scenario, state) {
             withdrawal: 0,
             gkState: gkState !== null && gkState !== void 0 ? gkState : undefined,
             effectivelyDepleted: true,
+            event: 'standard',
         };
     }
     const standardParams = {
@@ -194,35 +231,62 @@ export function calculateWithdrawal(scenario, state) {
     };
     let withdrawal;
     let updatedGkState;
+    let event = 'standard';
     switch (withdrawal_strategy) {
         case 'Standard': {
             withdrawal = calculateStandardWithdrawal(standardParams);
             break;
         }
         case 'Guyton-Klinger': {
+            // CONTRACT-016 → engine internal mapping. Prefer the new schema names
+            // when supplied; fall back to legacy `gk_*` fields otherwise.
+            const ceilingPct = guyton_guard_up_pct !== null && guyton_guard_up_pct !== void 0 ? guyton_guard_up_pct : gk_ceiling_pct;
+            const floorPct = guyton_guard_down_pct !== null && guyton_guard_down_pct !== void 0 ? guyton_guard_down_pct : gk_floor_pct;
+            // The "thresholds" already mean "guard band as a % of initial rate" in
+            // the existing engine implementation — re-use guyton_guard_* when present
+            // for both the hard limits and the trigger points so the behaviour stays
+            // self-consistent with the new schema's semantics.
+            const prosperityThreshold = guyton_guard_down_pct !== null && guyton_guard_down_pct !== void 0 ? guyton_guard_down_pct : gk_prosperity_threshold;
+            const preservationThreshold = guyton_guard_up_pct !== null && guyton_guard_up_pct !== void 0 ? guyton_guard_up_pct : gk_capital_preservation_threshold;
             const gkResult = calculateGuytonKlingerWithdrawal({
                 currentBalance,
                 availableBalance,
                 cpiIndex,
                 gkState,
                 standardParams,
-                gkCeilingPct: gk_ceiling_pct,
-                gkFloorPct: gk_floor_pct,
-                gkProsperityThreshold: gk_prosperity_threshold,
-                gkCapitalPreservationThreshold: gk_capital_preservation_threshold,
+                gkCeilingPct: ceilingPct,
+                gkFloorPct: floorPct,
+                gkProsperityThreshold: prosperityThreshold,
+                gkCapitalPreservationThreshold: preservationThreshold,
             });
             withdrawal = gkResult.withdrawal;
             updatedGkState = gkResult.gkState;
+            if (gkResult.event)
+                event = gkResult.event;
             break;
         }
         case 'Age-Banded': {
-            withdrawal = calculateAgeBandedWithdrawal({
+            const banded = calculateAgeBandedWithdrawal({
                 age,
                 currentBalance,
                 availableBalance,
                 spendingPhases: spending_phases,
                 cpiIndex,
             });
+            withdrawal = banded.withdrawal;
+            if (banded.matched)
+                event = 'band';
+            break;
+        }
+        case 'Fixed-Pct': {
+            // Default to 4% (matches CONTRACT-016 schema default) when the field is
+            // absent on a legacy scenario.
+            withdrawal = calculateFixedPctWithdrawal({
+                fixed_withdrawal_pct: fixed_withdrawal_pct !== null && fixed_withdrawal_pct !== void 0 ? fixed_withdrawal_pct : 4,
+                priorEndBalance,
+                availableBalance,
+            });
+            // Per CONTRACT-016 there is no event tag for Fixed-Pct → 'standard'.
             break;
         }
         default: {
@@ -232,7 +296,7 @@ export function calculateWithdrawal(scenario, state) {
         }
     }
     const log = getLogger();
-    log.debug('Withdrawal calculated', { strategy: withdrawal_strategy, amount: withdrawal });
+    log.debug('Withdrawal calculated', { strategy: withdrawal_strategy, amount: withdrawal, event });
     // Near-zero threshold: if balance after withdrawal would be below $100, treat as depleted
     const balanceAfterWithdrawal = availableBalance - withdrawal;
     const effectivelyDepleted = balanceAfterWithdrawal >= 0 && balanceAfterWithdrawal < NEAR_ZERO_THRESHOLD;
@@ -240,5 +304,6 @@ export function calculateWithdrawal(scenario, state) {
         withdrawal,
         gkState: updatedGkState,
         effectivelyDepleted,
+        event,
     };
 }

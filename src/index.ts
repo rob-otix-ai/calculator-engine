@@ -22,6 +22,7 @@ export type {
   FinancialItem,
   Scenario,
   TimelineRow,
+  WithdrawalEvent,
   FanChartRow,
   Metrics,
 } from './types';
@@ -60,6 +61,30 @@ export {
   type OptimizerOutput,
   type OptimizerOptions,
 } from './optimizer';
+
+// Required-savings reverse solver (CONTRACT-016 / ADR-025)
+export {
+  findRequiredSavings,
+  type SolverResult,
+  type FindRequiredSavingsOptions,
+} from './required-savings';
+
+// Withdrawal strategy primitives (CONTRACT-016 / ADR-026) — exported so the
+// app can call individual strategies for comparison views.
+export {
+  calculateWithdrawal,
+  calculateStandardWithdrawal,
+  calculateGuytonKlingerWithdrawal,
+  calculateAgeBandedWithdrawal,
+  calculateFixedPctWithdrawal,
+  type WithdrawalParams,
+  type WithdrawalResult,
+  type StandardWithdrawalParams,
+  type GuytonKlingerWithdrawalParams,
+  type AgeBandedWithdrawalParams,
+  type FixedPctWithdrawalParams,
+  type GKState,
+} from './withdrawal';
 
 // Retirement age x spending heatmap
 export {

@@ -9,7 +9,13 @@
  * instead of nominal_return_pct / 100.
  */
 
-import type { Scenario, TimelineRow, Metrics, IncomeSource } from './types';
+import type {
+  Scenario,
+  TimelineRow,
+  Metrics,
+  IncomeSource,
+  WithdrawalEvent,
+} from './types';
 import { CadenceMultiplier } from './defaults';
 import { calculateTax, getRMDAmount, calculateRothConversion } from './tax';
 import {
@@ -49,7 +55,7 @@ function computeDesiredSpending(
     withdrawal_real_amount,
     withdrawal_frequency,
     withdrawal_strategy,
-    spending_phases,
+    fixed_withdrawal_pct,
   } = scenario;
 
   // Age-Banded has its own target (handled elsewhere), but for Standard / GK
@@ -58,6 +64,12 @@ function computeDesiredSpending(
     // For age-banded the "desired" equals the phase amount — we compute this
     // in the main loop where we know the age.
     return 0; // sentinel — caller overrides
+  }
+
+  // Fixed-Pct: the desired amount is simply pct * prior-year end balance.
+  if (withdrawal_strategy === 'Fixed-Pct') {
+    const pct = fixed_withdrawal_pct ?? 4;
+    return Math.max(0, priorEndBalance * (pct / 100));
   }
 
   let desired: number;
@@ -272,6 +284,7 @@ export function runProjection(
     let withdrawal = 0;
     let desiredSpending = 0;
     let shortfallWithdrawals = 0;
+    let withdrawalEvent: WithdrawalEvent = 'standard';
 
     if (age >= retirement_age) {
       // Available balance for withdrawal cap
@@ -311,6 +324,7 @@ export function runProjection(
       });
 
       withdrawal = wResult.withdrawal;
+      withdrawalEvent = wResult.event;
       if (wResult.gkState) {
         gkState = wResult.gkState;
       }
@@ -382,13 +396,15 @@ export function runProjection(
       contributions + netIncome + liquidityNet - withdrawal - fees - taxes;
 
     let growth: number;
+    let blackSwanLoss = 0;
 
     // ------------------------------------------------------------------
     // 10. BLACK SWAN
     // ------------------------------------------------------------------
     if (black_swan_enabled && age === black_swan_age) {
       // Override growth with the loss
-      growth = -(startBalance * (black_swan_loss_pct / 100));
+      blackSwanLoss = startBalance * (black_swan_loss_pct / 100);
+      growth = -blackSwanLoss;
       log.warn('Black swan event triggered', { age, lossPct: black_swan_loss_pct });
     } else {
       // Mid-year cash flow assumption:
@@ -458,6 +474,8 @@ export function runProjection(
       shortfall_mandatory: 0,
       shortfall_contributions: 0,
       shortfall_withdrawals: shortfallWithdrawals,
+      black_swan_loss: blackSwanLoss,
+      withdrawal_event: withdrawalEvent,
     };
 
     log.debug('Year end', { age, end_balance: endBalance });
