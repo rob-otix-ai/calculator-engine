@@ -821,6 +821,11 @@ export function runAdvancedProjection(
       shortfall_withdrawals: shortfallWithdrawals,
       black_swan_loss: yearBlackSwanLoss,
       withdrawal_event: withdrawalEvent,
+      // v0.4 additions: deterministic advanced projection still uses the flat
+      // legacy inflation rate; asset_returns is null because per-class
+      // multi-asset mode is not active in this code path.
+      inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
+      asset_returns: null,
     };
 
     timeline.push(row);

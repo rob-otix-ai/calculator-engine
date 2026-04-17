@@ -135,6 +135,28 @@ export function runProjection(
 
   const timeline: TimelineRow[] = [];
 
+  // -------------------------------------------------------------------------
+  // v0.4: resolve inflation rate and effective return for the deterministic
+  // projection. Back-compat: when these new fields are absent, we fall back
+  // to the existing `inflation_pct` / `nominal_return_pct` so the v0.3
+  // behaviour is byte-identical.
+  // -------------------------------------------------------------------------
+  const inflationModel = scenario.inflation_model ?? 'Flat';
+  const effectiveInflationPct =
+    inflationModel === 'AR1'
+      ? scenario.inflation_long_run_mean_pct ?? inflation_pct
+      : inflation_pct;
+
+  const assetClasses = scenario.asset_classes ?? [];
+  const multiAsset = assetClasses.length > 0;
+  // Weighted-mean expected return across the asset classes, in decimal.
+  const weightedMeanReturn = multiAsset
+    ? assetClasses.reduce(
+        (acc, ac) => acc + (ac.weight_pct / 100) * (ac.expected_return_pct / 100),
+        0,
+      )
+    : nominal_return_pct / 100;
+
   // Running state
   let prevEndBalance = current_balance;
   let cpiIndex = 1.0;
@@ -164,7 +186,7 @@ export function runProjection(
 
     // Update CPI index (starts at 1.0 for year 0)
     if (yearIndex > 0 && inflation_enabled) {
-      cpiIndex *= 1 + inflation_pct / 100;
+      cpiIndex *= 1 + effectiveInflationPct / 100;
     }
 
     // ------------------------------------------------------------------
@@ -352,8 +374,12 @@ export function runProjection(
     // ------------------------------------------------------------------
     const managementFee = startBalance * (fee_pct / 100);
 
-    // Gross gain for performance fee (before fees, using the year's return rate)
-    const returnRate = overrideReturns?.[yearIndex] ?? nominal_return_pct / 100;
+    // Gross gain for performance fee (before fees, using the year's return rate).
+    // v0.4: in multi-asset mode without an override, we use the weighted-mean
+    // expected return so deterministic output remains consistent with the MC
+    // mean path.
+    const returnRate =
+      overrideReturns?.[yearIndex] ?? weightedMeanReturn;
     const grossGain = startBalance * returnRate;
 
     let perfFee = 0;
@@ -476,6 +502,11 @@ export function runProjection(
       shortfall_withdrawals: shortfallWithdrawals,
       black_swan_loss: blackSwanLoss,
       withdrawal_event: withdrawalEvent,
+      // v0.4 additions — single-asset deterministic projection: realised
+      // inflation is the configured flat rate (or 0 when inflation is off);
+      // asset_returns is null because we are not in multi-asset mode.
+      inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
+      asset_returns: null,
     };
 
     log.debug('Year end', { age, end_balance: endBalance });

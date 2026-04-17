@@ -70,15 +70,25 @@ export function runSensitivityAnalysis(
   const log = getLogger();
   log.info('Starting sensitivity analysis', { parameterCount: PARAMETERS.length });
 
+  // v0.4 (ADR-027/031): force-disable stochastic features so the tornado
+  // chart reflects single-parameter sensitivity in isolation.
+  const baseScenario: Scenario = {
+    ...scenario,
+    inflation_model: 'Flat' as const,
+    longevity_model: 'Fixed' as const,
+    return_distribution_kind: 'LogNormal' as const,
+    asset_classes: [],
+  };
+
   const factors: SensitivityFactor[] = [];
 
   for (const param of PARAMETERS) {
     // Skip withdrawal_pct when strategy is Age-Banded (not applicable)
-    if (param.name === 'withdrawal_pct' && scenario.withdrawal_strategy === 'Age-Banded') {
+    if (param.name === 'withdrawal_pct' && baseScenario.withdrawal_strategy === 'Age-Banded') {
       continue;
     }
 
-    const baselineValue = (scenario as Record<string, unknown>)[param.name] as number;
+    const baselineValue = (baseScenario as Record<string, unknown>)[param.name] as number;
 
     // Compute absolute delta
     const absDelta = param.deltaIsPct
@@ -91,8 +101,8 @@ export function runSensitivityAnalysis(
     // --- Clamping guards ---
     if (param.name === 'retirement_age') {
       // retirement_age must stay in (current_age, end_age)
-      lowValue = clamp(Math.round(lowValue), scenario.current_age + 1, scenario.end_age - 1);
-      highValue = clamp(Math.round(highValue), scenario.current_age + 1, scenario.end_age - 1);
+      lowValue = clamp(Math.round(lowValue), baseScenario.current_age + 1, baseScenario.end_age - 1);
+      highValue = clamp(Math.round(highValue), baseScenario.current_age + 1, baseScenario.end_age - 1);
     } else if (
       param.name === 'nominal_return_pct' ||
       param.name === 'inflation_pct' ||
@@ -109,7 +119,7 @@ export function runSensitivityAnalysis(
     }
 
     // Run projection with low value
-    const lowScenario = cloneScenario(scenario);
+    const lowScenario = cloneScenario(baseScenario);
     (lowScenario as Record<string, unknown>)[param.name] = lowValue;
     // ADR-027: sensitivity must always exclude the Black Swan stress event so
     // bands are interpretable in isolation.
@@ -117,7 +127,7 @@ export function runSensitivityAnalysis(
     const lowResult = projectionFn(lowScenario);
 
     // Run projection with high value
-    const highScenario = cloneScenario(scenario);
+    const highScenario = cloneScenario(baseScenario);
     (highScenario as Record<string, unknown>)[param.name] = highValue;
     highScenario.black_swan_enabled = false;
     const highResult = projectionFn(highScenario);

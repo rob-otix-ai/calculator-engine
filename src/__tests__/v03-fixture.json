@@ -1,0 +1,27 @@
+{
+  "detRunMetrics": {
+    "terminal_nominal": 10560631.870534958,
+    "terminal_real": 2400258.301747078,
+    "first_shortfall_age": null,
+    "readiness_score": 100,
+    "total_contributions": 350000,
+    "total_withdrawals": 8156353.487732654,
+    "total_fees": 1399167.5842914192,
+    "total_taxes": 0,
+    "estate_value": 10560631.870534958
+  },
+  "mc": {
+    "probability_no_shortfall": 100,
+    "median_terminal": 1655566.1159770908,
+    "p10_terminal": 598987.3670926923,
+    "p90_terminal": 4878362.525935733,
+    "runs_completed": 500,
+    "first5Terminals": [
+      850272.1334223117,
+      1688225.5733266973,
+      7018216.051185282,
+      1072436.452260471,
+      1316040.4977310624
+    ]
+  }
+}
