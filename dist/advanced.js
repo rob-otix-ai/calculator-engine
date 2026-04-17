@@ -16,10 +16,10 @@
  *   8. Insolvency check
  *   9. Investment growth (per-item rates, fees, performance fees)
  */
-import { CadenceMultiplier } from './defaults';
-import { calculateTax } from './tax';
-import { calculateWithdrawal, } from './withdrawal';
-import { getLogger } from './logger';
+import { CadenceMultiplier } from './defaults.js';
+import { calculateTax } from './tax.js';
+import { calculateWithdrawal, } from './withdrawal.js';
+import { getLogger } from './logger.js';
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -705,6 +705,11 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             shortfall_withdrawals: shortfallWithdrawals,
             black_swan_loss: yearBlackSwanLoss,
             withdrawal_event: withdrawalEvent,
+            // v0.4 additions: deterministic advanced projection still uses the flat
+            // legacy inflation rate; asset_returns is null because per-class
+            // multi-asset mode is not active in this code path.
+            inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
+            asset_returns: null,
         };
         timeline.push(row);
     }

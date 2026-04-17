@@ -6,7 +6,7 @@
  * a caller-provided projection function, keeping MC fully decoupled from the
  * projection engine.
  */
-import type { Scenario, TimelineRow, Metrics, FanChartRow } from './types';
+import type { Scenario, TimelineRow, Metrics, FanChartRow, RiskMetrics } from './types';
 export type ProjectionFn = (scenario: Scenario, overrideReturns?: number[]) => {
     timeline: TimelineRow[];
     metrics: Metrics;
@@ -28,6 +28,12 @@ export interface MCResult {
     terminal_distribution: number[];
     runs_completed: number;
     truncated: boolean;
+    /** v0.4: institutional risk metrics. Present when mc_runs >= 200 && horizon >= 10. */
+    risk_metrics?: RiskMetrics;
+    /** v0.4: per-age inflation fan chart. Present when inflation_model === 'AR1'. */
+    inflation_fan_chart?: FanChartRow[];
+    /** v0.4: histogram of sampled death ages. Present when longevity_model !== 'Fixed'. */
+    lifespan_distribution?: number[];
 }
 export declare class SeededRNG {
     private state;

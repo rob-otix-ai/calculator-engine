@@ -1,0 +1,931 @@
+{
+    "_source": "us_equity from Shiller real total stock return; us_bond and us_cpi are synthetic placeholders generated with a seeded RNG to preserve realistic mean/stdev/correlation. Replace with authoritative Ibbotson + BLS CPI data before production.",
+    "_first_year": 1871,
+    "_last_year": 2024,
+    "rows": [
+        {
+            "year": 1871,
+            "us_equity": 0.1478,
+            "us_bond": 0.0494,
+            "us_cpi": 0.0183
+        },
+        {
+            "year": 1872,
+            "us_equity": 0.1076,
+            "us_bond": 0.0498,
+            "us_cpi": 0.0097
+        },
+        {
+            "year": 1873,
+            "us_equity": -0.0415,
+            "us_bond": 0.005,
+            "us_cpi": -0.0033
+        },
+        {
+            "year": 1874,
+            "us_equity": 0.1249,
+            "us_bond": 0.0511,
+            "us_cpi": 0.0187
+        },
+        {
+            "year": 1875,
+            "us_equity": 0.0555,
+            "us_bond": 0.0965,
+            "us_cpi": 0.0399
+        },
+        {
+            "year": 1876,
+            "us_equity": -0.029,
+            "us_bond": 0.0513,
+            "us_cpi": 0.0423
+        },
+        {
+            "year": 1877,
+            "us_equity": 0.0187,
+            "us_bond": 0.0143,
+            "us_cpi": 0.0203
+        },
+        {
+            "year": 1878,
+            "us_equity": 0.1797,
+            "us_bond": 0.0276,
+            "us_cpi": 0.0335
+        },
+        {
+            "year": 1879,
+            "us_equity": 0.2102,
+            "us_bond": -0.0174,
+            "us_cpi": 0.0382
+        },
+        {
+            "year": 1880,
+            "us_equity": 0.2361,
+            "us_bond": 0.021,
+            "us_cpi": 0.0299
+        },
+        {
+            "year": 1881,
+            "us_equity": 0.0118,
+            "us_bond": 0.0246,
+            "us_cpi": 0.0269
+        },
+        {
+            "year": 1882,
+            "us_equity": 0.0043,
+            "us_bond": 0.0261,
+            "us_cpi": 0.0309
+        },
+        {
+            "year": 1883,
+            "us_equity": -0.0041,
+            "us_bond": 0.0313,
+            "us_cpi": 0.0304
+        },
+        {
+            "year": 1884,
+            "us_equity": -0.0785,
+            "us_bond": 0.0569,
+            "us_cpi": 0.0451
+        },
+        {
+            "year": 1885,
+            "us_equity": 0.3034,
+            "us_bond": 0.0324,
+            "us_cpi": 0.0225
+        },
+        {
+            "year": 1886,
+            "us_equity": 0.135,
+            "us_bond": -0.0152,
+            "us_cpi": 0.0404
+        },
+        {
+            "year": 1887,
+            "us_equity": -0.0122,
+            "us_bond": 0.0881,
+            "us_cpi": 0.0346
+        },
+        {
+            "year": 1888,
+            "us_equity": 0.0447,
+            "us_bond": 0.0863,
+            "us_cpi": 0.0193
+        },
+        {
+            "year": 1889,
+            "us_equity": 0.0511,
+            "us_bond": 0.0272,
+            "us_cpi": 0.0418
+        },
+        {
+            "year": 1890,
+            "us_equity": -0.0678,
+            "us_bond": 0.0405,
+            "us_cpi": 0.0424
+        },
+        {
+            "year": 1891,
+            "us_equity": 0.192,
+            "us_bond": 0.067,
+            "us_cpi": 0.019
+        },
+        {
+            "year": 1892,
+            "us_equity": 0.0486,
+            "us_bond": -0.0007,
+            "us_cpi": 0.0058
+        },
+        {
+            "year": 1893,
+            "us_equity": -0.1716,
+            "us_bond": 0.0502,
+            "us_cpi": -0.0033
+        },
+        {
+            "year": 1894,
+            "us_equity": 0.0311,
+            "us_bond": 0.0342,
+            "us_cpi": 0.0101
+        },
+        {
+            "year": 1895,
+            "us_equity": 0.052,
+            "us_bond": 0.0523,
+            "us_cpi": 0.0281
+        },
+        {
+            "year": 1896,
+            "us_equity": -0.0146,
+            "us_bond": -0.0098,
+            "us_cpi": 0.0081
+        },
+        {
+            "year": 1897,
+            "us_equity": 0.1768,
+            "us_bond": 0.0892,
+            "us_cpi": 0.0269
+        },
+        {
+            "year": 1898,
+            "us_equity": 0.2315,
+            "us_bond": 0.0555,
+            "us_cpi": 0.0301
+        },
+        {
+            "year": 1899,
+            "us_equity": 0.0178,
+            "us_bond": 0.0393,
+            "us_cpi": 0.0207
+        },
+        {
+            "year": 1900,
+            "us_equity": 0.1422,
+            "us_bond": 0.074,
+            "us_cpi": 0.0047
+        },
+        {
+            "year": 1901,
+            "us_equity": 0.2007,
+            "us_bond": 0.0156,
+            "us_cpi": 0.005
+        },
+        {
+            "year": 1902,
+            "us_equity": 0.0694,
+            "us_bond": 0.0168,
+            "us_cpi": 0.0158
+        },
+        {
+            "year": 1903,
+            "us_equity": -0.1724,
+            "us_bond": 0.0626,
+            "us_cpi": 0.0128
+        },
+        {
+            "year": 1904,
+            "us_equity": 0.3269,
+            "us_bond": -0.0456,
+            "us_cpi": -0.0081
+        },
+        {
+            "year": 1905,
+            "us_equity": 0.2206,
+            "us_bond": 0.0661,
+            "us_cpi": 0.0222
+        },
+        {
+            "year": 1906,
+            "us_equity": -0.0123,
+            "us_bond": 0.0889,
+            "us_cpi": 0.021
+        },
+        {
+            "year": 1907,
+            "us_equity": -0.3274,
+            "us_bond": 0.0749,
+            "us_cpi": 0.0334
+        },
+        {
+            "year": 1908,
+            "us_equity": 0.4576,
+            "us_bond": 0.0634,
+            "us_cpi": 0.0134
+        },
+        {
+            "year": 1909,
+            "us_equity": 0.1805,
+            "us_bond": 0.0946,
+            "us_cpi": 0.0226
+        },
+        {
+            "year": 1910,
+            "us_equity": -0.0254,
+            "us_bond": 0.0257,
+            "us_cpi": 0.0312
+        },
+        {
+            "year": 1911,
+            "us_equity": 0.0399,
+            "us_bond": 0.0433,
+            "us_cpi": 0.0541
+        },
+        {
+            "year": 1912,
+            "us_equity": 0.0196,
+            "us_bond": 0.0685,
+            "us_cpi": 0.0364
+        },
+        {
+            "year": 1913,
+            "us_equity": -0.1087,
+            "us_bond": 0.0649,
+            "us_cpi": 0.0302
+        },
+        {
+            "year": 1914,
+            "us_equity": -0.0641,
+            "us_bond": 0.0541,
+            "us_cpi": 0.0217
+        },
+        {
+            "year": 1915,
+            "us_equity": 0.3197,
+            "us_bond": 0.0559,
+            "us_cpi": 0.0346
+        },
+        {
+            "year": 1916,
+            "us_equity": -0.0159,
+            "us_bond": 0.0227,
+            "us_cpi": 0.0352
+        },
+        {
+            "year": 1917,
+            "us_equity": -0.318,
+            "us_bond": 0.0434,
+            "us_cpi": 0.0391
+        },
+        {
+            "year": 1918,
+            "us_equity": 0.1073,
+            "us_bond": 0.0282,
+            "us_cpi": 0.052
+        },
+        {
+            "year": 1919,
+            "us_equity": 0.0759,
+            "us_bond": 0.08,
+            "us_cpi": 0.0309
+        },
+        {
+            "year": 1920,
+            "us_equity": -0.1702,
+            "us_bond": 0.0176,
+            "us_cpi": 0.0361
+        },
+        {
+            "year": 1921,
+            "us_equity": 0.2315,
+            "us_bond": 0.0451,
+            "us_cpi": 0.0359
+        },
+        {
+            "year": 1922,
+            "us_equity": 0.2934,
+            "us_bond": 0.0064,
+            "us_cpi": 0.044
+        },
+        {
+            "year": 1923,
+            "us_equity": 0.054,
+            "us_bond": 0.0394,
+            "us_cpi": 0.038
+        },
+        {
+            "year": 1924,
+            "us_equity": 0.2772,
+            "us_bond": 0.0294,
+            "us_cpi": 0.0072
+        },
+        {
+            "year": 1925,
+            "us_equity": 0.2808,
+            "us_bond": 0.0755,
+            "us_cpi": 0.0091
+        },
+        {
+            "year": 1926,
+            "us_equity": 0.1124,
+            "us_bond": 0.0645,
+            "us_cpi": -0.0129
+        },
+        {
+            "year": 1927,
+            "us_equity": 0.3727,
+            "us_bond": 0.0108,
+            "us_cpi": -0.0295
+        },
+        {
+            "year": 1928,
+            "us_equity": 0.4362,
+            "us_bond": 0.049,
+            "us_cpi": -0.0197
+        },
+        {
+            "year": 1929,
+            "us_equity": -0.0885,
+            "us_bond": 0.0334,
+            "us_cpi": 0.0199
+        },
+        {
+            "year": 1930,
+            "us_equity": -0.2512,
+            "us_bond": 0.1154,
+            "us_cpi": 0.0362
+        },
+        {
+            "year": 1931,
+            "us_equity": -0.3887,
+            "us_bond": 0.0781,
+            "us_cpi": 0.0225
+        },
+        {
+            "year": 1932,
+            "us_equity": -0.0157,
+            "us_bond": 0.0505,
+            "us_cpi": 0.0259
+        },
+        {
+            "year": 1933,
+            "us_equity": 0.5701,
+            "us_bond": 0.0004,
+            "us_cpi": 0.0026
+        },
+        {
+            "year": 1934,
+            "us_equity": 0.0225,
+            "us_bond": 0.0783,
+            "us_cpi": 0.0136
+        },
+        {
+            "year": 1935,
+            "us_equity": 0.4577,
+            "us_bond": 0.0708,
+            "us_cpi": 0.0059
+        },
+        {
+            "year": 1936,
+            "us_equity": 0.3274,
+            "us_bond": 0.039,
+            "us_cpi": 0.016
+        },
+        {
+            "year": 1937,
+            "us_equity": -0.3788,
+            "us_bond": 0.0349,
+            "us_cpi": 0.0221
+        },
+        {
+            "year": 1938,
+            "us_equity": 0.2862,
+            "us_bond": 0.0411,
+            "us_cpi": 0.0333
+        },
+        {
+            "year": 1939,
+            "us_equity": 0.023,
+            "us_bond": 0.0758,
+            "us_cpi": 0.0171
+        },
+        {
+            "year": 1940,
+            "us_equity": -0.0935,
+            "us_bond": 0.0477,
+            "us_cpi": 0.0358
+        },
+        {
+            "year": 1941,
+            "us_equity": -0.1792,
+            "us_bond": 0.0369,
+            "us_cpi": 0.0261
+        },
+        {
+            "year": 1942,
+            "us_equity": 0.1218,
+            "us_bond": 0.0382,
+            "us_cpi": 0.022
+        },
+        {
+            "year": 1943,
+            "us_equity": 0.2275,
+            "us_bond": 0.028,
+            "us_cpi": 0.0155
+        },
+        {
+            "year": 1944,
+            "us_equity": 0.1741,
+            "us_bond": 0.0988,
+            "us_cpi": 0.0227
+        },
+        {
+            "year": 1945,
+            "us_equity": 0.3413,
+            "us_bond": 0.0295,
+            "us_cpi": 0.0246
+        },
+        {
+            "year": 1946,
+            "us_equity": -0.2449,
+            "us_bond": 0.0498,
+            "us_cpi": 0.0403
+        },
+        {
+            "year": 1947,
+            "us_equity": -0.0434,
+            "us_bond": 0.034,
+            "us_cpi": 0.074
+        },
+        {
+            "year": 1948,
+            "us_equity": 0.0233,
+            "us_bond": 0.0511,
+            "us_cpi": 0.0583
+        },
+        {
+            "year": 1949,
+            "us_equity": 0.2115,
+            "us_bond": 0.0675,
+            "us_cpi": 0.0513
+        },
+        {
+            "year": 1950,
+            "us_equity": 0.2493,
+            "us_bond": 0.0197,
+            "us_cpi": 0.025
+        },
+        {
+            "year": 1951,
+            "us_equity": 0.1458,
+            "us_bond": 0.0572,
+            "us_cpi": 0.0314
+        },
+        {
+            "year": 1952,
+            "us_equity": 0.147,
+            "us_bond": 0.0791,
+            "us_cpi": 0.0206
+        },
+        {
+            "year": 1953,
+            "us_equity": -0.0124,
+            "us_bond": 0.0198,
+            "us_cpi": 0.002
+        },
+        {
+            "year": 1954,
+            "us_equity": 0.5266,
+            "us_bond": 0.0346,
+            "us_cpi": 0.0093
+        },
+        {
+            "year": 1955,
+            "us_equity": 0.3139,
+            "us_bond": 0.0578,
+            "us_cpi": 0.0108
+        },
+        {
+            "year": 1956,
+            "us_equity": 0.0389,
+            "us_bond": -0.0033,
+            "us_cpi": 0.0321
+        },
+        {
+            "year": 1957,
+            "us_equity": -0.1401,
+            "us_bond": 0.0906,
+            "us_cpi": 0.0617
+        },
+        {
+            "year": 1958,
+            "us_equity": 0.4292,
+            "us_bond": -0.0176,
+            "us_cpi": 0.0661
+        },
+        {
+            "year": 1959,
+            "us_equity": 0.1055,
+            "us_bond": 0.0242,
+            "us_cpi": 0.0225
+        },
+        {
+            "year": 1960,
+            "us_equity": -0.0012,
+            "us_bond": 0.0703,
+            "us_cpi": 0.0123
+        },
+        {
+            "year": 1961,
+            "us_equity": 0.2638,
+            "us_bond": -0.0032,
+            "us_cpi": 0.0331
+        },
+        {
+            "year": 1962,
+            "us_equity": -0.1001,
+            "us_bond": 0.0168,
+            "us_cpi": 0.0217
+        },
+        {
+            "year": 1963,
+            "us_equity": 0.2055,
+            "us_bond": 0.0302,
+            "us_cpi": 0.0431
+        },
+        {
+            "year": 1964,
+            "us_equity": 0.1555,
+            "us_bond": 0.0543,
+            "us_cpi": 0.0533
+        },
+        {
+            "year": 1965,
+            "us_equity": 0.104,
+            "us_bond": 0.0246,
+            "us_cpi": 0.0599
+        },
+        {
+            "year": 1966,
+            "us_equity": -0.1369,
+            "us_bond": 0.015,
+            "us_cpi": 0.035
+        },
+        {
+            "year": 1967,
+            "us_equity": 0.2084,
+            "us_bond": 0.0545,
+            "us_cpi": 0.0442
+        },
+        {
+            "year": 1968,
+            "us_equity": 0.0658,
+            "us_bond": 0.0535,
+            "us_cpi": 0.0261
+        },
+        {
+            "year": 1969,
+            "us_equity": -0.1464,
+            "us_bond": 0.0002,
+            "us_cpi": 0.0364
+        },
+        {
+            "year": 1970,
+            "us_equity": -0.0203,
+            "us_bond": 0.0135,
+            "us_cpi": 0.0333
+        },
+        {
+            "year": 1971,
+            "us_equity": 0.1068,
+            "us_bond": 0.0621,
+            "us_cpi": 0.0245
+        },
+        {
+            "year": 1972,
+            "us_equity": 0.152,
+            "us_bond": 0.0016,
+            "us_cpi": 0.0226
+        },
+        {
+            "year": 1973,
+            "us_equity": -0.2343,
+            "us_bond": 0.0815,
+            "us_cpi": 0.0324
+        },
+        {
+            "year": 1974,
+            "us_equity": -0.3728,
+            "us_bond": 0.0731,
+            "us_cpi": 0.0458
+        },
+        {
+            "year": 1975,
+            "us_equity": 0.2896,
+            "us_bond": 0.0074,
+            "us_cpi": 0.0265
+        },
+        {
+            "year": 1976,
+            "us_equity": 0.1924,
+            "us_bond": 0.0221,
+            "us_cpi": 0.0371
+        },
+        {
+            "year": 1977,
+            "us_equity": -0.1248,
+            "us_bond": 0.0422,
+            "us_cpi": 0.0391
+        },
+        {
+            "year": 1978,
+            "us_equity": -0.0186,
+            "us_bond": 0.0828,
+            "us_cpi": 0.0332
+        },
+        {
+            "year": 1979,
+            "us_equity": 0.0574,
+            "us_bond": -0.0003,
+            "us_cpi": 0.0426
+        },
+        {
+            "year": 1980,
+            "us_equity": 0.1934,
+            "us_bond": 0.0394,
+            "us_cpi": 0.0053
+        },
+        {
+            "year": 1981,
+            "us_equity": -0.1269,
+            "us_bond": 0.0285,
+            "us_cpi": 0.0168
+        },
+        {
+            "year": 1982,
+            "us_equity": 0.1703,
+            "us_bond": 0.0464,
+            "us_cpi": 0.0097
+        },
+        {
+            "year": 1983,
+            "us_equity": 0.1871,
+            "us_bond": 0.0905,
+            "us_cpi": 0.0108
+        },
+        {
+            "year": 1984,
+            "us_equity": 0.0122,
+            "us_bond": 0.0899,
+            "us_cpi": 0.023
+        },
+        {
+            "year": 1985,
+            "us_equity": 0.281,
+            "us_bond": 0.0972,
+            "us_cpi": 0
+        },
+        {
+            "year": 1986,
+            "us_equity": 0.1683,
+            "us_bond": 0.0372,
+            "us_cpi": 0.0112
+        },
+        {
+            "year": 1987,
+            "us_equity": 0.0192,
+            "us_bond": 0.072,
+            "us_cpi": 0.016
+        },
+        {
+            "year": 1988,
+            "us_equity": 0.1201,
+            "us_bond": 0.0305,
+            "us_cpi": 0.0231
+        },
+        {
+            "year": 1989,
+            "us_equity": 0.2662,
+            "us_bond": 0.0584,
+            "us_cpi": 0.0022
+        },
+        {
+            "year": 1990,
+            "us_equity": -0.0917,
+            "us_bond": 0.0056,
+            "us_cpi": 0.0023
+        },
+        {
+            "year": 1991,
+            "us_equity": 0.2654,
+            "us_bond": 0.0751,
+            "us_cpi": 0.0148
+        },
+        {
+            "year": 1992,
+            "us_equity": 0.0441,
+            "us_bond": 0.0214,
+            "us_cpi": 0.0022
+        },
+        {
+            "year": 1993,
+            "us_equity": 0.072,
+            "us_bond": 0.0381,
+            "us_cpi": 0.0062
+        },
+        {
+            "year": 1994,
+            "us_equity": -0.0138,
+            "us_bond": 0.0156,
+            "us_cpi": 0.0219
+        },
+        {
+            "year": 1995,
+            "us_equity": 0.3452,
+            "us_bond": 0.0267,
+            "us_cpi": 0.0284
+        },
+        {
+            "year": 1996,
+            "us_equity": 0.192,
+            "us_bond": 0.084,
+            "us_cpi": 0.007
+        },
+        {
+            "year": 1997,
+            "us_equity": 0.3128,
+            "us_bond": 0.0861,
+            "us_cpi": 0.0303
+        },
+        {
+            "year": 1998,
+            "us_equity": 0.2709,
+            "us_bond": 0.0933,
+            "us_cpi": 0.0121
+        },
+        {
+            "year": 1999,
+            "us_equity": 0.1826,
+            "us_bond": 0.0015,
+            "us_cpi": -0.0085
+        },
+        {
+            "year": 2000,
+            "us_equity": -0.1249,
+            "us_bond": 0.0532,
+            "us_cpi": 0.0131
+        },
+        {
+            "year": 2001,
+            "us_equity": -0.1347,
+            "us_bond": 0.0025,
+            "us_cpi": 0.0385
+        },
+        {
+            "year": 2002,
+            "us_equity": -0.2388,
+            "us_bond": 0.1043,
+            "us_cpi": 0.0505
+        },
+        {
+            "year": 2003,
+            "us_equity": 0.2637,
+            "us_bond": 0.0041,
+            "us_cpi": 0.024
+        },
+        {
+            "year": 2004,
+            "us_equity": 0.0769,
+            "us_bond": 0.0386,
+            "us_cpi": 0.041
+        },
+        {
+            "year": 2005,
+            "us_equity": 0.0146,
+            "us_bond": 0.0933,
+            "us_cpi": 0.0337
+        },
+        {
+            "year": 2006,
+            "us_equity": 0.1338,
+            "us_bond": 0.0767,
+            "us_cpi": 0.003
+        },
+        {
+            "year": 2007,
+            "us_equity": 0.0111,
+            "us_bond": 0.0455,
+            "us_cpi": 0.0139
+        },
+        {
+            "year": 2008,
+            "us_equity": -0.3685,
+            "us_bond": 0.0571,
+            "us_cpi": 0.0486
+        },
+        {
+            "year": 2009,
+            "us_equity": 0.2646,
+            "us_bond": 0.0474,
+            "us_cpi": 0.039
+        },
+        {
+            "year": 2010,
+            "us_equity": 0.1306,
+            "us_bond": 0.0779,
+            "us_cpi": 0.0362
+        },
+        {
+            "year": 2011,
+            "us_equity": -0.0183,
+            "us_bond": 0.0907,
+            "us_cpi": 0.0296
+        },
+        {
+            "year": 2012,
+            "us_equity": 0.1396,
+            "us_bond": 0.0122,
+            "us_cpi": 0.0276
+        },
+        {
+            "year": 2013,
+            "us_equity": 0.3069,
+            "us_bond": 0.0426,
+            "us_cpi": 0.0447
+        },
+        {
+            "year": 2014,
+            "us_equity": 0.1156,
+            "us_bond": 0.0253,
+            "us_cpi": 0.0313
+        },
+        {
+            "year": 2015,
+            "us_equity": 0.0065,
+            "us_bond": 0.0436,
+            "us_cpi": 0.039
+        },
+        {
+            "year": 2016,
+            "us_equity": 0.0977,
+            "us_bond": -0.0007,
+            "us_cpi": 0.0164
+        },
+        {
+            "year": 2017,
+            "us_equity": 0.193,
+            "us_bond": 0.0821,
+            "us_cpi": 0.0376
+        },
+        {
+            "year": 2018,
+            "us_equity": -0.0624,
+            "us_bond": 0.0447,
+            "us_cpi": 0.0533
+        },
+        {
+            "year": 2019,
+            "us_equity": 0.288,
+            "us_bond": 0.0359,
+            "us_cpi": 0.0265
+        },
+        {
+            "year": 2020,
+            "us_equity": 0.164,
+            "us_bond": 0.0426,
+            "us_cpi": 0.043
+        },
+        {
+            "year": 2021,
+            "us_equity": 0.2168,
+            "us_bond": -0.0191,
+            "us_cpi": 0.0376
+        },
+        {
+            "year": 2022,
+            "us_equity": -0.2455,
+            "us_bond": 0.067,
+            "us_cpi": 0.0222
+        },
+        {
+            "year": 2023,
+            "us_equity": 0.2214,
+            "us_bond": 0.0429,
+            "us_cpi": 0.014
+        },
+        {
+            "year": 2024,
+            "us_equity": 0.2315,
+            "us_bond": 0.0223,
+            "us_cpi": 0.0125
+        }
+    ]
+}

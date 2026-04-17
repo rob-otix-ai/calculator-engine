@@ -1,4 +1,4 @@
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 const PARAMETERS = [
     { name: 'nominal_return_pct', label: 'Return +/-1%', delta: 1, deltaIsPct: false },
     { name: 'inflation_pct', label: 'Inflation +/-0.5%', delta: 0.5, deltaIsPct: false },
@@ -40,13 +40,16 @@ export function runSensitivityAnalysis(scenario, projectionFn) {
     var _a;
     const log = getLogger();
     log.info('Starting sensitivity analysis', { parameterCount: PARAMETERS.length });
+    // v0.4 (ADR-027/031): force-disable stochastic features so the tornado
+    // chart reflects single-parameter sensitivity in isolation.
+    const baseScenario = Object.assign(Object.assign({}, scenario), { inflation_model: 'Flat', longevity_model: 'Fixed', return_distribution_kind: 'LogNormal', asset_classes: [] });
     const factors = [];
     for (const param of PARAMETERS) {
         // Skip withdrawal_pct when strategy is Age-Banded (not applicable)
-        if (param.name === 'withdrawal_pct' && scenario.withdrawal_strategy === 'Age-Banded') {
+        if (param.name === 'withdrawal_pct' && baseScenario.withdrawal_strategy === 'Age-Banded') {
             continue;
         }
-        const baselineValue = scenario[param.name];
+        const baselineValue = baseScenario[param.name];
         // Compute absolute delta
         const absDelta = param.deltaIsPct
             ? baselineValue * (param.delta / 100)
@@ -56,8 +59,8 @@ export function runSensitivityAnalysis(scenario, projectionFn) {
         // --- Clamping guards ---
         if (param.name === 'retirement_age') {
             // retirement_age must stay in (current_age, end_age)
-            lowValue = clamp(Math.round(lowValue), scenario.current_age + 1, scenario.end_age - 1);
-            highValue = clamp(Math.round(highValue), scenario.current_age + 1, scenario.end_age - 1);
+            lowValue = clamp(Math.round(lowValue), baseScenario.current_age + 1, baseScenario.end_age - 1);
+            highValue = clamp(Math.round(highValue), baseScenario.current_age + 1, baseScenario.end_age - 1);
         }
         else if (param.name === 'nominal_return_pct' ||
             param.name === 'inflation_pct' ||
@@ -73,14 +76,14 @@ export function runSensitivityAnalysis(scenario, projectionFn) {
             highValue = Math.max(0, highValue);
         }
         // Run projection with low value
-        const lowScenario = cloneScenario(scenario);
+        const lowScenario = cloneScenario(baseScenario);
         lowScenario[param.name] = lowValue;
         // ADR-027: sensitivity must always exclude the Black Swan stress event so
         // bands are interpretable in isolation.
         lowScenario.black_swan_enabled = false;
         const lowResult = projectionFn(lowScenario);
         // Run projection with high value
-        const highScenario = cloneScenario(scenario);
+        const highScenario = cloneScenario(baseScenario);
         highScenario[param.name] = highValue;
         highScenario.black_swan_enabled = false;
         const highResult = projectionFn(highScenario);

@@ -23,6 +23,7 @@ import { buildReturnSampler, DEFAULT_CORRELATIONS } from './return-sampler';
 import { buildInflationSampler } from './inflation-sampler';
 import { buildLongevitySampler } from './longevity-sampler';
 import { computeRiskMetrics, type MCRiskInputs } from './risk-metrics';
+import { resolveWeights } from './glide-path';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -326,13 +327,27 @@ export function runMonteCarloSimulation(
       ? (inflationProcess as { initial_pct: number }).initial_pct / 100
       : scenario.inflation_pct / 100;
 
+    // v0.5: resolve glide-path configuration for this trial
+    const glidePath = scenario.glide_path ?? [];
+    const useGlidePath = glidePath.length > 0;
+
     if (returnSampler) {
       // Multi-asset path: weighted portfolio return per year
       for (let y = 0; y < numYears; y++) {
         const assetReturns = returnSampler.sample(y);
         let portfolioReturn = 0;
-        for (const ac of assetClasses) {
-          portfolioReturn += (ac.weight_pct / 100) * (assetReturns[ac.id] ?? 0);
+        // v0.5: use glide-path-interpolated weights when available
+        if (useGlidePath) {
+          const yearAge = scenario.current_age + y;
+          const weights = resolveWeights(yearAge, assetClasses, glidePath);
+          for (const ac of assetClasses) {
+            const w = (weights[ac.id] ?? ac.weight_pct) / 100;
+            portfolioReturn += w * (assetReturns[ac.id] ?? 0);
+          }
+        } else {
+          for (const ac of assetClasses) {
+            portfolioReturn += (ac.weight_pct / 100) * (assetReturns[ac.id] ?? 0);
+          }
         }
         annualReturns.push(portfolioReturn);
 

@@ -24,6 +24,7 @@ import {
   type GKState,
 } from './withdrawal';
 import { getLogger } from './logger';
+import { resolveWeights } from './glide-path';
 
 // =============================================================================
 // Helpers
@@ -149,8 +150,12 @@ export function runProjection(
 
   const assetClasses = scenario.asset_classes ?? [];
   const multiAsset = assetClasses.length > 0;
+  const glidePath = scenario.glide_path ?? [];
+  const useGlidePath = multiAsset && glidePath.length > 0;
+
   // Weighted-mean expected return across the asset classes, in decimal.
-  const weightedMeanReturn = multiAsset
+  // When glide path is active, this is computed per-year in the loop.
+  const staticWeightedMeanReturn = multiAsset
     ? assetClasses.reduce(
         (acc, ac) => acc + (ac.weight_pct / 100) * (ac.expected_return_pct / 100),
         0,
@@ -378,6 +383,17 @@ export function runProjection(
     // v0.4: in multi-asset mode without an override, we use the weighted-mean
     // expected return so deterministic output remains consistent with the MC
     // mean path.
+    // v0.5: when glide_path is active, compute per-year weighted mean using
+    // interpolated weights for this age.
+    let weightedMeanReturn = staticWeightedMeanReturn;
+    if (useGlidePath) {
+      const yearWeights = resolveWeights(age, assetClasses, glidePath);
+      weightedMeanReturn = 0;
+      for (const ac of assetClasses) {
+        const w = (yearWeights[ac.id] ?? ac.weight_pct) / 100;
+        weightedMeanReturn += w * (ac.expected_return_pct / 100);
+      }
+    }
     const returnRate =
       overrideReturns?.[yearIndex] ?? weightedMeanReturn;
     const grossGain = startBalance * returnRate;
@@ -435,8 +451,9 @@ export function runProjection(
     } else {
       // Mid-year cash flow assumption:
       // growth = startBalance * return + netFlows * return * 0.5
+      // v0.5: use glide-path-aware weighted mean when in multi-asset mode
       const effectiveReturn =
-        overrideReturns?.[yearIndex] ?? nominal_return_pct / 100;
+        overrideReturns?.[yearIndex] ?? weightedMeanReturn;
       growth =
         startBalance * effectiveReturn + netFlows * effectiveReturn * 0.5;
     }

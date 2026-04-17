@@ -1,4 +1,4 @@
-export type { Cadence, CurrencyCode, ContribStep, ProfitStep, RaiseStep, YieldStep, IncomeStep, LoanDraw, LumpRepayment, SpendingPhase, TaxConfig, IncomeSource, Asset, LiquidityEvent, FinancialItemCategory, FinancialItem, Scenario, TimelineRow, WithdrawalEvent, FanChartRow, Metrics, } from './types';
+export type { Cadence, CurrencyCode, ContribStep, ProfitStep, RaiseStep, YieldStep, IncomeStep, LoanDraw, LumpRepayment, SpendingPhase, TaxConfig, IncomeSource, Asset, LiquidityEvent, FinancialItemCategory, FinancialItem, Scenario, TimelineRow, WithdrawalEvent, FanChartRow, Metrics, AssetClass, AssetClassId, ReturnCorrelationMatrix, RiskMetrics, ReturnProcess, InflationProcess, LongevityModel, Sex, ReturnSampler, InflationSampler, LongevitySampler, GlidePathStep, FrontierPoint, EfficientFrontierResult, ClaimingOptimizerResult, } from './types';
 export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
 export { runProjection } from './projection';
 export { runAdvancedProjection } from './advanced';
@@ -10,5 +10,12 @@ export { findRequiredSavings, type SolverResult, type FindRequiredSavingsOptions
 export { calculateWithdrawal, calculateStandardWithdrawal, calculateGuytonKlingerWithdrawal, calculateAgeBandedWithdrawal, calculateFixedPctWithdrawal, type WithdrawalParams, type WithdrawalResult, type StandardWithdrawalParams, type GuytonKlingerWithdrawalParams, type AgeBandedWithdrawalParams, type FixedPctWithdrawalParams, type GKState, } from './withdrawal';
 export { generateHeatmap, type HeatmapCell, type HeatmapOptions, } from './heatmap';
 export { blendPortfolio, calculateEstateValue, type BlendedPortfolio, } from './portfolio';
+export { buildReturnSampler, DEFAULT_ASSET_CLASSES, DEFAULT_CORRELATIONS, SHILLER_SERIES, } from './return-sampler';
+export { buildInflationSampler, INFLATION_CALIBRATION_PRESETS, INFLATION_CALIBRATION_PRESETS as INFLATION_PRESETS, } from './inflation-sampler';
+export { buildLongevitySampler, } from './longevity-sampler';
+export { computeRiskMetrics, type MCRiskInputs } from './risk-metrics';
+export { resolveWeights } from './glide-path';
+export { computeEfficientFrontier } from './efficient-frontier';
+export { optimizeSsClaiming, optimizePensionClaiming, optimizeAnnuityTiming, SSA_ADJUSTMENT_FACTORS, ANNUITY_RATE_TABLE, } from './claiming-optimizers';
 export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';
 //# sourceMappingURL=index.d.ts.map

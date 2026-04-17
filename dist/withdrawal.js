@@ -11,7 +11,7 @@
  * - GK oscillation: bounded by floor/ceiling — no special handling needed
  * - RMD override: caller responsibility (if RMD > withdrawal, caller uses RMD)
  */
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
