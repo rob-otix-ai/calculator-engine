@@ -37,6 +37,11 @@ export type {
   ReturnSampler,
   InflationSampler,
   LongevitySampler,
+  // v0.5 optimization types (CONTRACT-019)
+  GlidePathStep,
+  FrontierPoint,
+  EfficientFrontierResult,
+  ClaimingOptimizerResult,
 } from './types';
 
 export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
@@ -131,6 +136,21 @@ export {
 } from './longevity-sampler';
 
 export { computeRiskMetrics, type MCRiskInputs } from './risk-metrics';
+
+// v0.5 — Glide-path allocation (ADR-034 / CONTRACT-019)
+export { resolveWeights } from './glide-path';
+
+// v0.5 — Efficient frontier (ADR-035 / CONTRACT-019)
+export { computeEfficientFrontier } from './efficient-frontier';
+
+// v0.5 — Claiming optimizers (ADR-036 / CONTRACT-019)
+export {
+  optimizeSsClaiming,
+  optimizePensionClaiming,
+  optimizeAnnuityTiming,
+  SSA_ADJUSTMENT_FACTORS,
+  ANNUITY_RATE_TABLE,
+} from './claiming-optimizers';
 
 // Logger utilities
 export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';

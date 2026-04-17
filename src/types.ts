@@ -375,6 +375,69 @@ export interface Scenario {
 
   // Risk metrics (ADR-033)
   risk_free_rate_pct?: number;
+
+  // --------------------------------------------------------------------------
+  // v0.5 optimization suite (CONTRACT-019) — all optional, all defaulted
+  // --------------------------------------------------------------------------
+
+  /** Glide-path allocation steps (ADR-034). Default: [] (static weights). */
+  glide_path?: GlidePathStep[];
+
+  /** User-specified or optimizer-determined SS claiming age (62-70). */
+  ss_claiming_age?: number | null;
+
+  /** Pension benefit reduction per year before NRA (default 3). */
+  pension_early_factor_pct?: number;
+
+  /** Pension benefit increase per year after NRA (default 6). */
+  pension_late_factor_pct?: number;
+
+  /** Percentage of portfolio used to purchase annuity at optimal age (default 0). */
+  annuity_purchase_pct?: number;
+}
+
+// ---------------------------------------------------------------------------
+// v0.5 — Optimization Suite (ADR-034 through ADR-036, CONTRACT-019)
+// ---------------------------------------------------------------------------
+
+/**
+ * One step in a glide-path allocation schedule.
+ * Ages must be sorted ascending with no duplicates.
+ * Weights at each step must sum to 100 (+/- 1).
+ */
+export interface GlidePathStep {
+  age: number;
+  weights: Record<AssetClassId, number>;
+}
+
+/**
+ * A single point on the efficient frontier.
+ */
+export interface FrontierPoint {
+  expected_return_pct: number;
+  portfolio_stdev_pct: number;
+  weights: Record<AssetClassId, number>;
+  sharpe_ratio: number;
+}
+
+/**
+ * Result of computing the efficient frontier.
+ */
+export interface EfficientFrontierResult {
+  frontier: FrontierPoint[];
+  current_portfolio: FrontierPoint;
+  max_sharpe: FrontierPoint;
+  min_variance: FrontierPoint;
+  distance_to_frontier_pct: number;
+}
+
+/**
+ * Result of a claiming optimizer (SS, Pension, or Annuity).
+ */
+export interface ClaimingOptimizerResult {
+  optimal_age: number;
+  metric_at_optimal: number;
+  sweep: Array<{ age: number; metric_value: number }>;
 }
 
 // ---------------------------------------------------------------------------

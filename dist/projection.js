@@ -8,10 +8,11 @@
  * annual returns — when provided, overrideReturns[yearIndex] is used
  * instead of nominal_return_pct / 100.
  */
-import { CadenceMultiplier } from './defaults';
-import { calculateTax, getRMDAmount, calculateRothConversion } from './tax';
-import { calculateWithdrawal, NEAR_ZERO_THRESHOLD, } from './withdrawal';
-import { getLogger } from './logger';
+import { CadenceMultiplier } from './defaults.js';
+import { calculateTax, getRMDAmount, calculateRothConversion } from './tax.js';
+import { calculateWithdrawal, NEAR_ZERO_THRESHOLD, } from './withdrawal.js';
+import { getLogger } from './logger.js';
+import { resolveWeights } from './glide-path.js';
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -59,7 +60,7 @@ function computeDesiredSpending(scenario, priorEndBalance, cpiIndex) {
 // Main Projection
 // =============================================================================
 export function runProjection(scenario, overrideReturns) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const { current_age, retirement_age, end_age, current_balance, contrib_amount, contrib_cadence, contrib_increase_pct, nominal_return_pct, inflation_pct, inflation_enabled, fee_pct, perf_fee_pct, enable_taxes, effective_tax_rate_pct, tax_jurisdiction, tax_config, tax_deferred_pct, planning_mode, partner_current_age, partner_income_sources, income_sources, liquidity_events, 
     // assets — not used in basic-mode projection (estate_pct is advanced-mode only)
     black_swan_enabled, black_swan_age, black_swan_loss_pct, spending_phases, withdrawal_strategy, } = scenario;
@@ -71,6 +72,25 @@ export function runProjection(scenario, overrideReturns) {
         detailMode: scenario.detail_mode,
     });
     const timeline = [];
+    // -------------------------------------------------------------------------
+    // v0.4: resolve inflation rate and effective return for the deterministic
+    // projection. Back-compat: when these new fields are absent, we fall back
+    // to the existing `inflation_pct` / `nominal_return_pct` so the v0.3
+    // behaviour is byte-identical.
+    // -------------------------------------------------------------------------
+    const inflationModel = (_a = scenario.inflation_model) !== null && _a !== void 0 ? _a : 'Flat';
+    const effectiveInflationPct = inflationModel === 'AR1'
+        ? (_b = scenario.inflation_long_run_mean_pct) !== null && _b !== void 0 ? _b : inflation_pct
+        : inflation_pct;
+    const assetClasses = (_c = scenario.asset_classes) !== null && _c !== void 0 ? _c : [];
+    const multiAsset = assetClasses.length > 0;
+    const glidePath = (_d = scenario.glide_path) !== null && _d !== void 0 ? _d : [];
+    const useGlidePath = multiAsset && glidePath.length > 0;
+    // Weighted-mean expected return across the asset classes, in decimal.
+    // When glide path is active, this is computed per-year in the loop.
+    const staticWeightedMeanReturn = multiAsset
+        ? assetClasses.reduce((acc, ac) => acc + (ac.weight_pct / 100) * (ac.expected_return_pct / 100), 0)
+        : nominal_return_pct / 100;
     // Running state
     let prevEndBalance = current_balance;
     let cpiIndex = 1.0;
@@ -94,7 +114,7 @@ export function runProjection(scenario, overrideReturns) {
         const startBalance = yearIndex === 0 ? current_balance : prevEndBalance;
         // Update CPI index (starts at 1.0 for year 0)
         if (yearIndex > 0 && inflation_enabled) {
-            cpiIndex *= 1 + inflation_pct / 100;
+            cpiIndex *= 1 + effectiveInflationPct / 100;
         }
         // ------------------------------------------------------------------
         // 1. CONTRIBUTIONS (pre-retirement only)
@@ -244,8 +264,22 @@ export function runProjection(scenario, overrideReturns) {
         // 7. FEES
         // ------------------------------------------------------------------
         const managementFee = startBalance * (fee_pct / 100);
-        // Gross gain for performance fee (before fees, using the year's return rate)
-        const returnRate = (_a = overrideReturns === null || overrideReturns === void 0 ? void 0 : overrideReturns[yearIndex]) !== null && _a !== void 0 ? _a : nominal_return_pct / 100;
+        // Gross gain for performance fee (before fees, using the year's return rate).
+        // v0.4: in multi-asset mode without an override, we use the weighted-mean
+        // expected return so deterministic output remains consistent with the MC
+        // mean path.
+        // v0.5: when glide_path is active, compute per-year weighted mean using
+        // interpolated weights for this age.
+        let weightedMeanReturn = staticWeightedMeanReturn;
+        if (useGlidePath) {
+            const yearWeights = resolveWeights(age, assetClasses, glidePath);
+            weightedMeanReturn = 0;
+            for (const ac of assetClasses) {
+                const w = ((_e = yearWeights[ac.id]) !== null && _e !== void 0 ? _e : ac.weight_pct) / 100;
+                weightedMeanReturn += w * (ac.expected_return_pct / 100);
+            }
+        }
+        const returnRate = (_f = overrideReturns === null || overrideReturns === void 0 ? void 0 : overrideReturns[yearIndex]) !== null && _f !== void 0 ? _f : weightedMeanReturn;
         const grossGain = startBalance * returnRate;
         let perfFee = 0;
         if (perf_fee_pct > 0 && grossGain > 0) {
@@ -293,7 +327,8 @@ export function runProjection(scenario, overrideReturns) {
         else {
             // Mid-year cash flow assumption:
             // growth = startBalance * return + netFlows * return * 0.5
-            const effectiveReturn = (_b = overrideReturns === null || overrideReturns === void 0 ? void 0 : overrideReturns[yearIndex]) !== null && _b !== void 0 ? _b : nominal_return_pct / 100;
+            // v0.5: use glide-path-aware weighted mean when in multi-asset mode
+            const effectiveReturn = (_g = overrideReturns === null || overrideReturns === void 0 ? void 0 : overrideReturns[yearIndex]) !== null && _g !== void 0 ? _g : weightedMeanReturn;
             growth =
                 startBalance * effectiveReturn + netFlows * effectiveReturn * 0.5;
         }
@@ -351,6 +386,11 @@ export function runProjection(scenario, overrideReturns) {
             shortfall_withdrawals: shortfallWithdrawals,
             black_swan_loss: blackSwanLoss,
             withdrawal_event: withdrawalEvent,
+            // v0.4 additions — single-asset deterministic projection: realised
+            // inflation is the configured flat rate (or 0 when inflation is off);
+            // asset_returns is null because we are not in multi-asset mode.
+            inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
+            asset_returns: null,
         };
         log.debug('Year end', { age, end_balance: endBalance });
         timeline.push(row);
@@ -374,8 +414,8 @@ export function runProjection(scenario, overrideReturns) {
     // Compute Metrics
     // ====================================================================
     const lastRow = timeline[timeline.length - 1];
-    const terminalNominal = (_c = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_nominal) !== null && _c !== void 0 ? _c : 0;
-    const terminalReal = (_d = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_real) !== null && _d !== void 0 ? _d : 0;
+    const terminalNominal = (_h = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_nominal) !== null && _h !== void 0 ? _h : 0;
+    const terminalReal = (_j = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_real) !== null && _j !== void 0 ? _j : 0;
     // Readiness score: ratio of actual to desired spending, capped at 200
     let readinessScore;
     if (totalDesiredSpending > 0) {

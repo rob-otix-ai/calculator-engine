@@ -21,6 +21,14 @@ import {
   buildLongevitySampler,
   computeRiskMetrics,
   INFLATION_PRESETS,
+  // v0.5 exports
+  resolveWeights,
+  computeEfficientFrontier,
+  optimizeSsClaiming,
+  optimizePensionClaiming,
+  optimizeAnnuityTiming,
+  SSA_ADJUSTMENT_FACTORS,
+  ANNUITY_RATE_TABLE,
 } from '../../dist/index.js';
 
 import { readFileSync } from 'node:fs';
@@ -773,6 +781,425 @@ console.log('\nTest 22: Gompertz sampler determinism');
   const s1 = buildLongevitySampler({ kind: 'Gompertz', modal_age: 88, dispersion: 10 }, 42);
   const s2 = buildLongevitySampler({ kind: 'Gompertz', modal_age: 88, dispersion: 10 }, 42);
   assert(s1.sample(65) === s2.sample(65), 'same seed => same Gompertz sample');
+}
+
+// ===========================================================================
+// v0.5 — Optimization Suite Tests (CONTRACT-019)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Test 23: resolveWeights — no glide path returns static weights
+// ---------------------------------------------------------------------------
+console.log('\nTest 23: resolveWeights — no glide path');
+{
+  const weights = resolveWeights(40, DEFAULT_ASSET_CLASSES, []);
+  assert(weights.us_equity === 60, 'static us_equity weight = 60');
+  assert(weights.us_bond === 20, 'static us_bond weight = 20');
+}
+
+// ---------------------------------------------------------------------------
+// Test 24: resolveWeights — before first step uses initial weights
+// ---------------------------------------------------------------------------
+console.log('\nTest 24: resolveWeights — before first step');
+{
+  const glidePath = [
+    { age: 50, weights: { us_equity: 50, us_bond: 50 } },
+    { age: 70, weights: { us_equity: 30, us_bond: 70 } },
+  ];
+  const weights = resolveWeights(40, DEFAULT_ASSET_CLASSES, glidePath);
+  assert(weights.us_equity === 60, 'before first step: uses initial us_equity');
+}
+
+// ---------------------------------------------------------------------------
+// Test 25: resolveWeights — exact step age
+// ---------------------------------------------------------------------------
+console.log('\nTest 25: resolveWeights — exact step age');
+{
+  const glidePath = [
+    { age: 50, weights: { us_equity: 50, us_bond: 50 } },
+    { age: 70, weights: { us_equity: 30, us_bond: 70 } },
+  ];
+  const weights = resolveWeights(50, DEFAULT_ASSET_CLASSES, glidePath);
+  assert(weights.us_equity === 50, 'at step age 50: us_equity = 50');
+  assert(weights.us_bond === 50, 'at step age 50: us_bond = 50');
+}
+
+// ---------------------------------------------------------------------------
+// Test 26: resolveWeights — interpolation between steps
+// ---------------------------------------------------------------------------
+console.log('\nTest 26: resolveWeights — linear interpolation');
+{
+  const glidePath = [
+    { age: 50, weights: { us_equity: 80, us_bond: 20 } },
+    { age: 70, weights: { us_equity: 40, us_bond: 60 } },
+  ];
+  const weights = resolveWeights(60, DEFAULT_ASSET_CLASSES, glidePath);
+  // Midpoint: 80 + 0.5*(40-80) = 60
+  assert(Math.abs(weights.us_equity - 60) < 0.01, `interpolated us_equity = 60 (got ${weights.us_equity})`);
+  assert(Math.abs(weights.us_bond - 40) < 0.01, `interpolated us_bond = 40 (got ${weights.us_bond})`);
+}
+
+// ---------------------------------------------------------------------------
+// Test 27: resolveWeights — after last step
+// ---------------------------------------------------------------------------
+console.log('\nTest 27: resolveWeights — after last step');
+{
+  const glidePath = [
+    { age: 50, weights: { us_equity: 80, us_bond: 20 } },
+    { age: 60, weights: { us_equity: 40, us_bond: 60 } },
+  ];
+  const weights = resolveWeights(80, DEFAULT_ASSET_CLASSES, glidePath);
+  assert(weights.us_equity === 40, 'after last step: us_equity = 40');
+  assert(weights.us_bond === 60, 'after last step: us_bond = 60');
+}
+
+// ---------------------------------------------------------------------------
+// Test 28: SSA_ADJUSTMENT_FACTORS correctness
+// ---------------------------------------------------------------------------
+console.log('\nTest 28: SSA_ADJUSTMENT_FACTORS');
+{
+  assert(SSA_ADJUSTMENT_FACTORS[62] === 0.70, 'SSA factor age 62 = 0.70');
+  assert(SSA_ADJUSTMENT_FACTORS[67] === 1.00, 'SSA factor age 67 = 1.00 (FRA)');
+  assert(SSA_ADJUSTMENT_FACTORS[70] === 1.24, 'SSA factor age 70 = 1.24');
+  assert(SSA_ADJUSTMENT_FACTORS[65] === 0.867, 'SSA factor age 65 = 0.867');
+  assert(SSA_ADJUSTMENT_FACTORS[68] === 1.08, 'SSA factor age 68 = 1.08');
+  // All 9 ages present
+  const ssAges = Object.keys(SSA_ADJUSTMENT_FACTORS).map(Number);
+  assert(ssAges.length === 9, `SSA table has 9 entries (got ${ssAges.length})`);
+}
+
+// ---------------------------------------------------------------------------
+// Test 29: ANNUITY_RATE_TABLE coverage
+// ---------------------------------------------------------------------------
+console.log('\nTest 29: ANNUITY_RATE_TABLE');
+{
+  assert(ANNUITY_RATE_TABLE.length === 31, `annuity table has 31 entries (ages 55-85, got ${ANNUITY_RATE_TABLE.length})`);
+  assert(ANNUITY_RATE_TABLE[0].age === 55, 'first entry age 55');
+  assert(ANNUITY_RATE_TABLE[30].age === 85, 'last entry age 85');
+  // Male rates should increase with age
+  for (let i = 1; i < ANNUITY_RATE_TABLE.length; i++) {
+    assert(
+      ANNUITY_RATE_TABLE[i].male >= ANNUITY_RATE_TABLE[i - 1].male,
+      `male rate non-decreasing at age ${ANNUITY_RATE_TABLE[i].age}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Test 30: computeEfficientFrontier — basic 2-asset
+// ---------------------------------------------------------------------------
+console.log('\nTest 30: computeEfficientFrontier — 2 assets');
+{
+  const assets = [
+    { id: 'us_equity', name: 'Equity', expected_return_pct: 10, return_stdev_pct: 17, weight_pct: 60 },
+    { id: 'us_bond', name: 'Bond', expected_return_pct: 4, return_stdev_pct: 6, weight_pct: 40 },
+  ];
+  const corr = { ids: ['us_equity', 'us_bond'], values: [[1, 0.1], [0.1, 1]] };
+  const result = computeEfficientFrontier(assets, corr, 2);
+
+  assert(result.frontier.length === 20, `frontier has 20 points (got ${result.frontier.length})`);
+  assert(result.current_portfolio != null, 'current_portfolio defined');
+  assert(result.max_sharpe != null, 'max_sharpe defined');
+  assert(result.min_variance != null, 'min_variance defined');
+  assert(typeof result.distance_to_frontier_pct === 'number', 'distance_to_frontier_pct is number');
+}
+
+// ---------------------------------------------------------------------------
+// Test 31: computeEfficientFrontier — frontier is ordered
+// ---------------------------------------------------------------------------
+console.log('\nTest 31: computeEfficientFrontier — ordered frontier');
+{
+  const result = computeEfficientFrontier(DEFAULT_ASSET_CLASSES, DEFAULT_CORRELATIONS, 3);
+  // Expected return should be non-decreasing along the frontier
+  let ordered = true;
+  for (let i = 1; i < result.frontier.length; i++) {
+    if (result.frontier[i].expected_return_pct < result.frontier[i - 1].expected_return_pct - 0.01) {
+      ordered = false;
+      break;
+    }
+  }
+  assert(ordered, 'frontier points are ordered by increasing expected return');
+}
+
+// ---------------------------------------------------------------------------
+// Test 32: computeEfficientFrontier — all weights non-negative and sum ~100
+// ---------------------------------------------------------------------------
+console.log('\nTest 32: computeEfficientFrontier — weight constraints');
+{
+  const result = computeEfficientFrontier(DEFAULT_ASSET_CLASSES, DEFAULT_CORRELATIONS, 3);
+  let allValid = true;
+  for (const fp of result.frontier) {
+    const wSum = Object.values(fp.weights).reduce((s, w) => s + w, 0);
+    const allNonNeg = Object.values(fp.weights).every(w => w >= -0.01);
+    if (Math.abs(wSum - 100) > 2 || !allNonNeg) {
+      allValid = false;
+      break;
+    }
+  }
+  assert(allValid, 'all frontier points: weights >= 0, sum ~100');
+}
+
+// ---------------------------------------------------------------------------
+// Test 33: computeEfficientFrontier — single asset
+// ---------------------------------------------------------------------------
+console.log('\nTest 33: computeEfficientFrontier — single asset');
+{
+  const single = [{ id: 'cash', name: 'Cash', expected_return_pct: 3, return_stdev_pct: 1, weight_pct: 100 }];
+  const corr = { ids: ['cash'], values: [[1]] };
+  const result = computeEfficientFrontier(single, corr, 2);
+  assert(result.frontier.length === 20, 'single-asset frontier has 20 points');
+  assert(result.frontier[0].expected_return_pct === 3, 'single-asset return = 3');
+  assert(result.distance_to_frontier_pct === 0, 'single-asset distance = 0');
+}
+
+// ---------------------------------------------------------------------------
+// Test 34: optimizeSsClaiming — sweep completeness
+// ---------------------------------------------------------------------------
+console.log('\nTest 34: optimizeSsClaiming — sweep completeness');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 55,
+    retirement_age: 67,
+    end_age: 90,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 6,
+    inflation_pct: 2,
+    fee_pct: 0.5,
+    black_swan_enabled: false,
+    withdrawal_method: 'Fixed real-dollar amount',
+    withdrawal_real_amount: 40_000,
+    withdrawal_strategy: 'Standard',
+    income_sources: [
+      {
+        label: 'Social Security',
+        type: 'Social Security',
+        amount: 2000,
+        frequency: 'Monthly',
+        start_age: 67,
+        end_age: 90,
+        inflation_adjusted: true,
+        taxable: true,
+        tax_rate: 15,
+        enabled: true,
+      },
+    ],
+  };
+
+  const result = optimizeSsClaiming(scenario, runProjection);
+  assert(result.sweep.length === 9, `SS sweep has 9 entries (62-70, got ${result.sweep.length})`);
+  assert(result.optimal_age >= 62 && result.optimal_age <= 70, `optimal age in [62,70]: ${result.optimal_age}`);
+  assert(result.metric_at_optimal > 0, 'metric at optimal > 0');
+}
+
+// ---------------------------------------------------------------------------
+// Test 35: optimizeSsClaiming — no SS source
+// ---------------------------------------------------------------------------
+console.log('\nTest 35: optimizeSsClaiming — no SS source');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 55,
+    retirement_age: 65,
+    end_age: 85,
+    current_balance: 500_000,
+    income_sources: [],
+    black_swan_enabled: false,
+  };
+  const result = optimizeSsClaiming(scenario, runProjection);
+  assert(result.sweep.length >= 1, 'no SS source: returns at least 1 sweep entry');
+  assert(result.optimal_age === 67, 'no SS source: default optimal age = 67');
+}
+
+// ---------------------------------------------------------------------------
+// Test 36: optimizePensionClaiming — sweep completeness
+// ---------------------------------------------------------------------------
+console.log('\nTest 36: optimizePensionClaiming');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 50,
+    retirement_age: 65,
+    end_age: 90,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 6,
+    inflation_pct: 2,
+    fee_pct: 0.5,
+    black_swan_enabled: false,
+    withdrawal_method: 'Fixed real-dollar amount',
+    withdrawal_real_amount: 40_000,
+    withdrawal_strategy: 'Standard',
+    pension_early_factor_pct: 3,
+    pension_late_factor_pct: 6,
+    income_sources: [
+      {
+        label: 'DB Pension',
+        type: 'Pension',
+        amount: 20_000,
+        frequency: 'Annual',
+        start_age: 65,
+        end_age: 90,
+        inflation_adjusted: false,
+        taxable: true,
+        tax_rate: 20,
+        enabled: true,
+      },
+    ],
+  };
+
+  const result = optimizePensionClaiming(scenario, runProjection);
+  assert(result.sweep.length === 21, `pension sweep has 21 entries (55-75, got ${result.sweep.length})`);
+  assert(result.optimal_age >= 55 && result.optimal_age <= 75, `pension optimal age in [55,75]: ${result.optimal_age}`);
+}
+
+// ---------------------------------------------------------------------------
+// Test 37: optimizeAnnuityTiming — zero purchase pct
+// ---------------------------------------------------------------------------
+console.log('\nTest 37: optimizeAnnuityTiming — zero purchase pct');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 50,
+    retirement_age: 65,
+    end_age: 90,
+    current_balance: 500_000,
+    annuity_purchase_pct: 0,
+    black_swan_enabled: false,
+  };
+  const result = optimizeAnnuityTiming(scenario, runProjection);
+  assert(result.sweep.length === 1, 'zero pct: only 1 sweep entry');
+}
+
+// ---------------------------------------------------------------------------
+// Test 38: optimizeAnnuityTiming — with purchase pct
+// ---------------------------------------------------------------------------
+console.log('\nTest 38: optimizeAnnuityTiming — with purchase pct');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 50,
+    retirement_age: 65,
+    end_age: 90,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 6,
+    inflation_pct: 2,
+    fee_pct: 0.5,
+    black_swan_enabled: false,
+    withdrawal_method: 'Fixed real-dollar amount',
+    withdrawal_real_amount: 30_000,
+    withdrawal_strategy: 'Standard',
+    annuity_purchase_pct: 25,
+    income_sources: [],
+  };
+  const result = optimizeAnnuityTiming(scenario, runProjection);
+  assert(result.sweep.length === 16, `annuity sweep has 16 entries (50-65, got ${result.sweep.length})`);
+  assert(result.optimal_age >= 50 && result.optimal_age <= 65, `annuity optimal age in [50,65]: ${result.optimal_age}`);
+  assert(result.metric_at_optimal !== 0, 'metric at optimal is not zero');
+}
+
+// ---------------------------------------------------------------------------
+// Test 39: Glide path in deterministic projection — backwards compat
+// ---------------------------------------------------------------------------
+console.log('\nTest 39: Glide path backwards compat');
+{
+  // Same scenario as Test 13 but with empty glide_path — must be identical
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 30,
+    retirement_age: 65,
+    end_age: 90,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 7,
+    return_stdev_pct: 12,
+    return_distribution: 'log-normal',
+    inflation_pct: 2.5,
+    fee_pct: 0.5,
+    enable_mc: false,
+    black_swan_enabled: false,
+    glide_path: [],
+  };
+
+  const { metrics } = runProjection(scenario);
+  const tolerance = 0.01;
+  assert(
+    Math.abs(metrics.terminal_real - v03Fixture.detRunMetrics.terminal_real) < tolerance,
+    `empty glide_path: terminal_real matches v0.3 fixture`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 40: Glide path affects projection output
+// ---------------------------------------------------------------------------
+console.log('\nTest 40: Glide path changes projection');
+{
+  const baseScenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 40,
+    retirement_age: 65,
+    end_age: 85,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 7,
+    inflation_pct: 2,
+    fee_pct: 0.5,
+    enable_mc: false,
+    black_swan_enabled: false,
+    asset_classes: [
+      { id: 'us_equity', name: 'Equity', expected_return_pct: 10, return_stdev_pct: 17, weight_pct: 80 },
+      { id: 'us_bond', name: 'Bond', expected_return_pct: 4, return_stdev_pct: 6, weight_pct: 20 },
+    ],
+    return_correlation_matrix: { ids: ['us_equity', 'us_bond'], values: [[1, 0.1], [0.1, 1]] },
+  };
+
+  const { metrics: metricsNoGlide } = runProjection({ ...baseScenario, glide_path: [] });
+  const { metrics: metricsWithGlide } = runProjection({
+    ...baseScenario,
+    glide_path: [
+      { age: 40, weights: { us_equity: 80, us_bond: 20 } },
+      { age: 70, weights: { us_equity: 30, us_bond: 70 } },
+    ],
+  });
+
+  // The glide path de-risks over time, so terminal should differ
+  assert(
+    Math.abs(metricsNoGlide.terminal_real - metricsWithGlide.terminal_real) > 1,
+    `glide path changes terminal_real (no-glide: ${metricsNoGlide.terminal_real.toFixed(0)}, with-glide: ${metricsWithGlide.terminal_real.toFixed(0)})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 41: computeEfficientFrontier — max_sharpe has highest Sharpe
+// ---------------------------------------------------------------------------
+console.log('\nTest 41: max_sharpe has highest Sharpe ratio');
+{
+  const result = computeEfficientFrontier(DEFAULT_ASSET_CLASSES, DEFAULT_CORRELATIONS, 3);
+  const maxSharpe = Math.max(...result.frontier.map(fp => fp.sharpe_ratio));
+  assert(
+    result.max_sharpe.sharpe_ratio === maxSharpe,
+    `max_sharpe.sharpe_ratio (${result.max_sharpe.sharpe_ratio}) equals max across frontier (${maxSharpe})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 42: computeEfficientFrontier — min_variance has lowest stdev
+// ---------------------------------------------------------------------------
+console.log('\nTest 42: min_variance has lowest stdev');
+{
+  const result = computeEfficientFrontier(DEFAULT_ASSET_CLASSES, DEFAULT_CORRELATIONS, 3);
+  const minStdev = Math.min(...result.frontier.map(fp => fp.portfolio_stdev_pct));
+  assert(
+    result.min_variance.portfolio_stdev_pct === minStdev,
+    `min_variance stdev (${result.min_variance.portfolio_stdev_pct}) equals min across frontier (${minStdev})`,
+  );
 }
 
 // ---------------------------------------------------------------------------

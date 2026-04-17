@@ -6,7 +6,7 @@
  *
  * Also includes RMD (Required Minimum Distribution) and Roth conversion logic.
  */
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 const US_STANDARD_DEDUCTION_SINGLE = 15000;
 const US_STANDARD_DEDUCTION_MFJ = 30000;
 const US_BRACKETS_2025_SINGLE = [

@@ -1,4 +1,4 @@
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 /**
  * Computes weighted-average return, fee, perf-fee, and liquid percentage
  * across a set of basic-mode assets.

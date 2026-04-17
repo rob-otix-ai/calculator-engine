@@ -14,7 +14,7 @@
  *   - Monte Carlo:   when scenario.enable_mc and an mcFn is supplied, MC
  *                    `probability_no_shortfall` >= mcThreshold (default 90)
  */
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
