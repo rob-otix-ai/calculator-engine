@@ -25,6 +25,18 @@ export type {
   WithdrawalEvent,
   FanChartRow,
   Metrics,
+  // v0.4 stochastic types (CONTRACT-018)
+  AssetClass,
+  AssetClassId,
+  ReturnCorrelationMatrix,
+  RiskMetrics,
+  ReturnProcess,
+  InflationProcess,
+  LongevityModel,
+  Sex,
+  ReturnSampler,
+  InflationSampler,
+  LongevitySampler,
 } from './types';
 
 export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
@@ -99,6 +111,26 @@ export {
   calculateEstateValue,
   type BlendedPortfolio,
 } from './portfolio';
+
+// v0.4 stochastic samplers (ADR-030 through ADR-033)
+export {
+  buildReturnSampler,
+  DEFAULT_ASSET_CLASSES,
+  DEFAULT_CORRELATIONS,
+  SHILLER_SERIES,
+} from './return-sampler';
+
+export {
+  buildInflationSampler,
+  INFLATION_CALIBRATION_PRESETS,
+  INFLATION_CALIBRATION_PRESETS as INFLATION_PRESETS,
+} from './inflation-sampler';
+
+export {
+  buildLongevitySampler,
+} from './longevity-sampler';
+
+export { computeRiskMetrics, type MCRiskInputs } from './risk-metrics';
 
 // Logger utilities
 export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';

@@ -202,7 +202,19 @@ export function runHistoricalBacktest(
   projectionFn: (s: Scenario, returns: number[]) => { metrics: Metrics },
 ): BacktestResult {
   const log = getLogger();
-  const span = scenario.end_age - scenario.current_age;
+
+  // v0.4 (ADR-027/031): force-disable stochastic features for backtests.
+  // Historical windows already contain real-world volatility and inflation;
+  // layering stochastic samplers would double-count.
+  const baseScenario: Scenario = {
+    ...scenario,
+    inflation_model: 'Flat' as const,
+    longevity_model: 'Fixed' as const,
+    return_distribution_kind: 'LogNormal' as const,
+    asset_classes: [],
+  };
+
+  const span = baseScenario.end_age - baseScenario.current_age;
 
   // Guard: span must be at least 1
   if (span < 1) {
@@ -252,7 +264,7 @@ export function runHistoricalBacktest(
     // ADR-027: backtests already include real historical crashes — layering a
     // synthetic Black Swan event would double-count. Force-disable it on a
     // per-window scenario clone.
-    const periodScenario: Scenario = JSON.parse(JSON.stringify(scenario));
+    const periodScenario: Scenario = JSON.parse(JSON.stringify(baseScenario));
     periodScenario.black_swan_enabled = false;
 
     // Run projection with historical returns

@@ -333,6 +333,48 @@ export interface Scenario {
 
   // Withdrawal order
   withdrawal_order: string;
+
+  // --------------------------------------------------------------------------
+  // v0.4 stochastic foundation (CONTRACT-018) — all optional, all defaulted
+  // downstream. A v0.3-shape Scenario continues to typecheck and compute
+  // identical outputs.
+  // --------------------------------------------------------------------------
+
+  // Multi-asset (ADR-030)
+  asset_classes?: AssetClass[];
+  return_correlation_matrix?: ReturnCorrelationMatrix | null;
+  return_distribution_kind?: 'LogNormal' | 'StudentT' | 'Bootstrap';
+  return_distribution_dof?: number;
+  bootstrap_window?: [number, number];
+
+  // Inflation (ADR-031)
+  inflation_model?: 'Flat' | 'AR1';
+  inflation_long_run_mean_pct?: number;
+  inflation_ar1_phi?: number;
+  inflation_shock_stdev_pct?: number;
+  inflation_initial_pct?: number;
+  inflation_calibration_preset?:
+    | 'US-CPI'
+    | 'UK-CPI'
+    | 'UK-RPI'
+    | 'EU-HICP'
+    | 'Custom';
+  return_inflation_correlation?: number;
+  bond_inflation_correlation?: number;
+
+  // Longevity (ADR-032)
+  longevity_model?: 'Fixed' | 'Gompertz' | 'Cohort';
+  longevity_modal_age?: number;
+  longevity_dispersion?: number;
+  longevity_cohort_country?: 'US' | 'UK';
+  sex?: Sex;
+  longevity_partner_modal_age?: number | null;
+  longevity_partner_dispersion?: number;
+  longevity_partner_cohort_country?: 'US' | 'UK';
+  partner_sex?: Sex;
+
+  // Risk metrics (ADR-033)
+  risk_free_rate_pct?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +424,15 @@ export interface TimelineRow {
   black_swan_loss: number;
   /** Tag indicating which strategy event produced this year's withdrawal. */
   withdrawal_event: WithdrawalEvent;
+
+  // CONTRACT-018 / ADR-030..033 additions (v0.4). All defaulted; existing
+  // consumers that do not inspect these fields are unaffected.
+  /** Realised inflation rate for this year (decimal, e.g. 0.025 == 2.5%). */
+  inflation_this_year: number;
+  /** Per-asset realised return by AssetClassId. Null in single-asset mode. */
+  asset_returns: Record<string, number> | null;
+  /** True on the final row of an MC trial that was terminated by a stochastic longevity draw (not at end_age). */
+  death_sampled_this_trial?: boolean;
 }
 
 export interface FanChartRow {
@@ -403,4 +454,133 @@ export interface Metrics {
   total_fees: number;
   total_taxes: number;
   estate_value: number;
+}
+
+// ---------------------------------------------------------------------------
+// v0.4 — Stochastic Foundation (ADR-029 through ADR-033, CONTRACT-018)
+// ---------------------------------------------------------------------------
+
+/**
+ * A stable identifier for an asset class within a scenario. Common canonical
+ * values are listed first; arbitrary user-defined ids are also permitted.
+ */
+export type AssetClassId =
+  | 'us_equity'
+  | 'intl_equity'
+  | 'us_bond'
+  | 'intl_bond'
+  | 'reit'
+  | 'commodities'
+  | 'cash'
+  | string;
+
+/**
+ * One row of the multi-asset portfolio.
+ * Weights across all AssetClasses in a Scenario must sum to 100 +/- 1.
+ */
+export interface AssetClass {
+  id: AssetClassId;
+  name: string;
+  expected_return_pct: number;
+  return_stdev_pct: number;
+  weight_pct: number;
+}
+
+/**
+ * Square symmetric positive-semi-definite matrix indexed by AssetClassId.
+ * Validated at the engine boundary via attempted Cholesky factorisation.
+ */
+export interface ReturnCorrelationMatrix {
+  ids: AssetClassId[];
+  values: number[][];
+}
+
+/**
+ * Sex designation used by the Gompertz and cohort longevity models.
+ */
+export type Sex = 'M' | 'F' | 'Unspecified';
+
+/**
+ * Discriminated union describing the sampling process for annual returns.
+ *  - LogNormal: current v0.3 behaviour (multivariate log-normal).
+ *  - StudentT: Student-t copula with configurable degrees of freedom.
+ *  - Bootstrap: resamples simultaneous tuples from a bundled historical series.
+ */
+export type ReturnProcess =
+  | { kind: 'LogNormal' }
+  | { kind: 'StudentT'; dof: number }
+  | { kind: 'Bootstrap'; window: [number, number] };
+
+/**
+ * Stochastic inflation process. Flat is a no-op passthrough; AR(1) follows the
+ * recurrence defined in ADR-031.
+ */
+export type InflationProcess =
+  | { kind: 'Flat'; rate_pct: number }
+  | {
+      kind: 'AR1';
+      long_run_mean_pct: number;
+      phi: number;
+      shock_stdev_pct: number;
+      initial_pct: number;
+    };
+
+/**
+ * Longevity sampling model (ADR-032 / DDD-010).
+ */
+export type LongevityModel =
+  | { kind: 'Fixed'; end_age: number }
+  | { kind: 'Gompertz'; modal_age: number; dispersion: number; sex?: Sex }
+  | {
+      kind: 'Cohort';
+      country: 'US' | 'UK';
+      sex: Sex;
+      birth_year: number;
+    };
+
+/**
+ * Produces a correlated tuple of asset returns for a given year index.
+ * Must be deterministic given the build-time seed.
+ */
+export interface ReturnSampler {
+  sample(year: number): Record<AssetClassId, number>;
+}
+
+/**
+ * Produces an inflation rate (decimal, not percent) for a given year. The
+ * AR(1) variant consumes one draw per call; Flat is a no-op.
+ */
+export interface InflationSampler {
+  sample(year: number, priorInflation: number): number;
+  readonly kind: 'Flat' | 'AR1';
+}
+
+/**
+ * Samples a death age from the configured longevity model. `median` and
+ * `survival` are deterministic and do not consume randomness.
+ */
+export interface LongevitySampler {
+  sample(current_age: number): number;
+  median(current_age: number): number;
+  survival(age: number, current_age: number): number;
+  readonly kind: 'Fixed' | 'Gompertz' | 'Cohort';
+}
+
+/**
+ * Institutional risk metrics attached to a Monte Carlo result (ADR-033).
+ */
+export interface RiskMetrics {
+  var_95_terminal_real: number;
+  var_99_terminal_real: number;
+  cvar_95_terminal_real: number;
+  cvar_99_terminal_real: number;
+  var_95_return_pct: number;
+  sortino_ratio: number;
+  max_drawdown_pct: number;
+  max_drawdown_recovery_years: number;
+  median_drawdown_pct: number;
+  median_drawdown_recovery_years: number;
+  p10_year_by_year_balance_real: number[];
+  p50_year_by_year_balance_real: number[];
+  p90_year_by_year_balance_real: number[];
 }
