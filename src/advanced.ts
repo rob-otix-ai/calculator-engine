@@ -23,6 +23,8 @@ import type {
   TimelineRow,
   Metrics,
   WithdrawalEvent,
+  TaxBreakdown,
+  TaxLot,
 } from './types';
 import { CadenceMultiplier } from './defaults';
 import { calculateTax } from './tax';
@@ -31,6 +33,12 @@ import {
   type GKState,
 } from './withdrawal';
 import { getLogger } from './logger';
+import {
+  computeWrapperTax,
+  computeRMD,
+  type WrapperTaxConfig,
+} from './wrapper-tax';
+import { TaxLotTracker } from './tax-lots';
 
 // =============================================================================
 // Helper Functions
@@ -226,6 +234,30 @@ export function runAdvancedProjection(
       }
     }
   }
+
+  // -------------------------------------------------------------------------
+  // v0.6: Wrapper tax state
+  // -------------------------------------------------------------------------
+  const taxResidence = scenario.tax_residence ?? 'Custom';
+  const taxDomicile = scenario.tax_domicile ?? 'Non-Dom';
+  const cgtMethod = scenario.cgt_method ?? 'FIFO';
+  const remittanceBasisCharge = scenario.remittance_basis_charge ?? false;
+  const withholdingOverrides = scenario.withholding_overrides ?? {};
+  const hasWrappers = items.some((i) => i.wrapper && i.wrapper !== 'Taxable');
+
+  // Tax-lot trackers per investment item
+  const lotTrackers = new Map<number, TaxLotTracker>();
+  for (let idx = 0; idx < financial_items.length; idx++) {
+    const item = financial_items[idx];
+    if (!item.enabled || item.category !== 'Investment') continue;
+    const tracker = new TaxLotTracker();
+    const basis = item.cost_basis ?? item.current_value;
+    tracker.addLot(current_age, item.current_value, basis);
+    lotTrackers.set(idx, tracker);
+  }
+
+  // SIPP lump tracking per item
+  const sippLumpClaimed = new Map<number, boolean>();
 
   // -------------------------------------------------------------------------
   // Accumulators
@@ -593,6 +625,10 @@ export function runAdvancedProjection(
         );
         costBasis.set(idx, (costBasis.get(idx) ?? 0) + contrib);
         yearContributions += contrib;
+
+        // v0.6: track lot for CGT
+        const tracker = lotTrackers.get(idx);
+        if (tracker) tracker.addLot(age, contrib);
       }
     }
 
@@ -641,12 +677,109 @@ export function runAdvancedProjection(
     }
 
     // =====================================================================
+    // 6b. v0.6 — RMD ENFORCEMENT (US-Traditional wrappers)
+    // =====================================================================
+    let yearRmdAmount = 0;
+    if (hasWrappers) {
+      for (let idx = 0; idx < financial_items.length; idx++) {
+        const item = financial_items[idx];
+        if (!item.enabled || item.category !== 'Investment') continue;
+        const w = item.wrapper ?? 'Taxable';
+        if (w !== 'US-Traditional-401k' && w !== 'US-Traditional-IRA') continue;
+
+        const balance = investmentBalances.get(idx) ?? 0;
+        const rmd = computeRMD(age, balance);
+        if (rmd > 0 && rmd > yearWithdrawals) {
+          const additionalWithdrawal = Math.min(rmd, balance);
+          const tracker = lotTrackers.get(idx);
+          if (tracker) tracker.dispose(additionalWithdrawal, cgtMethod);
+          investmentBalances.set(idx, Math.max(0, balance - additionalWithdrawal));
+          cashBalance += additionalWithdrawal;
+          yearRmdAmount += additionalWithdrawal;
+          yearTaxableIncome += additionalWithdrawal;
+        }
+      }
+    }
+
+    // =====================================================================
+    // 6c. v0.6 — PER-WRAPPER TAX COMPUTATION
+    // =====================================================================
+    let yearTaxBreakdown: TaxBreakdown | null = null;
+
+    if (hasWrappers && enable_taxes && yearWithdrawals > 0) {
+      yearTaxBreakdown = {
+        income_tax: 0,
+        capital_gains_tax: 0,
+        dividend_withholding: 0,
+        rmd_forced_withdrawal: yearRmdAmount,
+        remittance_basis_charge: 0,
+        total: 0,
+      };
+
+      // Compute wrapper tax per item that had withdrawals
+      // For simplicity, apply wrapper tax to the total withdrawal from cash
+      // proportional to each wrapper's share of liquid investments
+      for (let idx = 0; idx < financial_items.length; idx++) {
+        const item = financial_items[idx];
+        if (!item.enabled || item.category !== 'Investment') continue;
+        const w = item.wrapper ?? 'Taxable';
+
+        // Approximate: compute tax as if the withdrawal came from this wrapper
+        const tracker = lotTrackers.get(idx);
+        const lots = tracker ? tracker.getLots() : [];
+
+        const wrapperConfig: WrapperTaxConfig = {
+          residence: taxResidence,
+          domicile: taxDomicile,
+          cgtMethod,
+          age,
+          taxableIncome: yearTaxableIncome,
+          withholdingOverrides,
+          remittanceBasisCharge,
+          sippLumpClaimed: sippLumpClaimed.get(idx) ?? false,
+        };
+
+        // Only compute if this wrapper type needs special treatment
+        if (w !== 'Taxable') {
+          // The share of withdrawal attributable to this wrapper
+          const totalInv = sumMap(investmentBalances);
+          const balance = investmentBalances.get(idx) ?? 0;
+          const share = totalInv > 0 ? balance / totalInv : 0;
+          const wrapperWithdrawal = yearWithdrawals * share;
+
+          if (wrapperWithdrawal > 0) {
+            const result = computeWrapperTax(w, wrapperWithdrawal, lots, wrapperConfig);
+            yearTaxBreakdown.income_tax += result.tax_breakdown.income_tax;
+            yearTaxBreakdown.capital_gains_tax += result.tax_breakdown.capital_gains_tax;
+            yearTaxBreakdown.dividend_withholding += result.tax_breakdown.dividend_withholding;
+            yearTaxBreakdown.remittance_basis_charge += result.tax_breakdown.remittance_basis_charge;
+
+            // Mark SIPP lump as claimed
+            if (w === 'UK-SIPP' && !sippLumpClaimed.get(idx)) {
+              sippLumpClaimed.set(idx, true);
+            }
+          }
+        }
+      }
+
+      yearTaxBreakdown.total = yearTaxBreakdown.income_tax
+        + yearTaxBreakdown.capital_gains_tax
+        + yearTaxBreakdown.dividend_withholding
+        + yearTaxBreakdown.rmd_forced_withdrawal
+        + yearTaxBreakdown.remittance_basis_charge;
+    }
+
+    // =====================================================================
     // 7. TAX SETTLEMENT
     // =====================================================================
 
     if (enable_taxes && yearTaxableIncome > 0) {
       let jurisdictionTax = 0;
-      if (tax_config) {
+
+      if (hasWrappers && yearTaxBreakdown) {
+        // v0.6: wrapper-aware tax already computed; use it
+        jurisdictionTax = yearTaxBreakdown.income_tax + yearTaxBreakdown.capital_gains_tax;
+      } else if (tax_config) {
         jurisdictionTax = calculateTax(
           yearTaxableIncome,
           tax_config,
@@ -721,6 +854,13 @@ export function runAdvancedProjection(
 
       const newBalance = balance + grossReturn - mgmtFee - perfFee;
       investmentBalances.set(idx, Math.max(0, newBalance));
+
+      // v0.6: update lot tracker with growth
+      const tracker = lotTrackers.get(idx);
+      if (tracker) {
+        const netReturnRate = (grossReturn - mgmtFee - perfFee) / (balance || 1);
+        tracker.applyGrowth(netReturnRate);
+      }
 
       yearGrowth += grossReturn;
       yearFees += mgmtFee + perfFee;
@@ -826,6 +966,9 @@ export function runAdvancedProjection(
       // multi-asset mode is not active in this code path.
       inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
       asset_returns: null,
+      // v0.6 additions
+      tax_breakdown: yearTaxBreakdown,
+      rmd_amount: yearRmdAmount,
     };
 
     timeline.push(row);

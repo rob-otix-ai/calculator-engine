@@ -145,6 +145,10 @@ export interface FinancialItem {
     loan_start_age: number;
     loan_credit_at_start: boolean;
     loan_lump_repayments: LumpRepayment[];
+    /** Tax wrapper this item sits in. Default: 'Taxable'. */
+    wrapper?: TaxWrapper;
+    /** Initial cost basis for CGT computation. Default: 0. */
+    cost_basis?: number;
 }
 export interface Scenario {
     [key: string]: unknown;
@@ -237,6 +241,20 @@ export interface Scenario {
     pension_late_factor_pct?: number;
     /** Percentage of portfolio used to purchase annuity at optimal age (default 0). */
     annuity_purchase_pct?: number;
+    /** Residence jurisdiction for income/CGT (default: 'Custom'). */
+    tax_residence?: TaxResidence;
+    /** Domicile for estate/IHT and remittance basis (default: 'Non-Dom'). */
+    tax_domicile?: TaxDomicile;
+    /** Apply £30k remittance basis charge (UK non-dom only). Default: false. */
+    remittance_basis_charge?: boolean;
+    /** CGT lot disposal method. Default: 'FIFO'. */
+    cgt_method?: 'FIFO' | 'HIFO';
+    /** Treaty rate overrides. Key: 'source:resident', value: rate 0-1. */
+    withholding_overrides?: Record<string, number>;
+    /** FATCA reporting flag (display only). Default: false. */
+    fatca_reporting?: boolean;
+    /** CRS reporting flag (display only). Default: false. */
+    crs_reporting?: boolean;
 }
 /**
  * One step in a glide-path allocation schedule.
@@ -323,6 +341,10 @@ export interface TimelineRow {
     asset_returns: Record<string, number> | null;
     /** True on the final row of an MC trial that was terminated by a stochastic longevity draw (not at end_age). */
     death_sampled_this_trial?: boolean;
+    /** Per-wrapper tax breakdown for this year. Null when no wrappers are active. */
+    tax_breakdown?: TaxBreakdown | null;
+    /** Forced RMD withdrawal for this year (0 if not applicable). */
+    rmd_amount?: number;
 }
 export interface FanChartRow {
     age: number;
@@ -371,6 +393,29 @@ export interface ReturnCorrelationMatrix {
  * Sex designation used by the Gompertz and cohort longevity models.
  */
 export type Sex = 'M' | 'F' | 'Unspecified';
+export type TaxResidence = 'US' | 'UK' | 'Cayman' | 'UAE' | 'Singapore' | 'Custom';
+export type TaxDomicile = 'US' | 'UK-Dom' | 'UK-Deemed-Dom' | 'UK-Non-Dom' | 'Non-Dom';
+export type TaxWrapper = 'Taxable' | 'US-Traditional-401k' | 'US-Traditional-IRA' | 'US-Roth-401k' | 'US-Roth-IRA' | 'UK-SIPP' | 'UK-ISA' | 'UK-Onshore-Bond' | 'UK-Offshore-Bond' | 'Offshore-Trust' | 'Cayman-Exempt-Company';
+export interface TaxLot {
+    year_acquired: number;
+    amount: number;
+    cost_basis: number;
+}
+export interface TaxBreakdown {
+    income_tax: number;
+    capital_gains_tax: number;
+    dividend_withholding: number;
+    rmd_forced_withdrawal: number;
+    remittance_basis_charge: number;
+    total: number;
+}
+export interface WrapperTaxResult {
+    wrapper: TaxWrapper;
+    gross_withdrawal: number;
+    tax_breakdown: TaxBreakdown;
+    net_withdrawal: number;
+    remaining_lots: TaxLot[];
+}
 /**
  * Discriminated union describing the sampling process for annual returns.
  *  - LogNormal: current v0.3 behaviour (multivariate log-normal).

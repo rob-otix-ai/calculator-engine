@@ -10,6 +10,7 @@
 import {
   DEFAULT_SCENARIO,
   runProjection,
+  runAdvancedProjection,
   runMonteCarloSimulation,
   runSensitivityAnalysis,
   findRequiredSavings,
@@ -29,6 +30,15 @@ import {
   optimizeAnnuityTiming,
   SSA_ADJUSTMENT_FACTORS,
   ANNUITY_RATE_TABLE,
+  // v0.6 exports
+  computeRMD,
+  computeWrapperTax,
+  TaxLotTracker,
+  RMD_DIVISOR_TABLE,
+  WITHHOLDING_TREATY_TABLE,
+  US_FEDERAL_TAX_BRACKETS_2025,
+  UK_INCOME_TAX_BANDS_2025,
+  getWithholdingRate,
 } from '../../dist/index.js';
 
 import { readFileSync } from 'node:fs';
@@ -1200,6 +1210,399 @@ console.log('\nTest 42: min_variance has lowest stdev');
     result.min_variance.portfolio_stdev_pct === minStdev,
     `min_variance stdev (${result.min_variance.portfolio_stdev_pct}) equals min across frontier (${minStdev})`,
   );
+}
+
+// ===========================================================================
+// v0.6 — Onshore/Offshore Tax Tests (CONTRACT-020)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Test 43: computeRMD — correct divisor at ages 73, 80, 90
+// ---------------------------------------------------------------------------
+console.log('\nTest 43: computeRMD divisors');
+{
+  const balance = 1_000_000;
+  const rmd73 = computeRMD(73, balance);
+  assert(
+    Math.abs(rmd73 - balance / 26.5) < 0.01,
+    `RMD at 73: ${rmd73.toFixed(2)} === ${(balance / 26.5).toFixed(2)}`,
+  );
+
+  const rmd80 = computeRMD(80, balance);
+  assert(
+    Math.abs(rmd80 - balance / 20.2) < 0.01,
+    `RMD at 80: ${rmd80.toFixed(2)} === ${(balance / 20.2).toFixed(2)}`,
+  );
+
+  const rmd90 = computeRMD(90, balance);
+  assert(
+    Math.abs(rmd90 - balance / 12.2) < 0.01,
+    `RMD at 90: ${rmd90.toFixed(2)} === ${(balance / 12.2).toFixed(2)}`,
+  );
+
+  // Below 73 returns 0
+  assert(computeRMD(72, balance) === 0, 'RMD at 72 returns 0');
+  assert(computeRMD(50, balance) === 0, 'RMD at 50 returns 0');
+}
+
+// ---------------------------------------------------------------------------
+// Test 44: computeWrapperTax for Taxable — CGT > 0 when gain exists
+// ---------------------------------------------------------------------------
+console.log('\nTest 44: computeWrapperTax — Taxable CGT');
+{
+  const lots = [
+    { year_acquired: 2020, amount: 100_000, cost_basis: 60_000 },
+  ];
+  const result = computeWrapperTax('Taxable', 50_000, lots, {
+    residence: 'US',
+    domicile: 'US',
+    cgtMethod: 'FIFO',
+    age: 65,
+    taxableIncome: 50_000,
+  });
+  assert(result.tax_breakdown.capital_gains_tax > 0, 'Taxable wrapper: CGT > 0 when gain exists');
+  assert(result.gross_withdrawal === 50_000, 'gross_withdrawal matches input');
+  assert(result.net_withdrawal < 50_000, 'net_withdrawal less than gross due to tax');
+}
+
+// ---------------------------------------------------------------------------
+// Test 45: computeWrapperTax for US-Roth — tax-free when qualified
+// ---------------------------------------------------------------------------
+console.log('\nTest 45: computeWrapperTax — US-Roth qualified');
+{
+  const lots = [
+    { year_acquired: 2015, amount: 200_000, cost_basis: 100_000 },
+  ];
+  const result = computeWrapperTax('US-Roth-IRA', 50_000, lots, {
+    residence: 'US',
+    domicile: 'US',
+    cgtMethod: 'FIFO',
+    age: 65,
+    taxableIncome: 0,
+    holdingStartYear: 2015,
+    currentYear: 2025,
+  });
+  assert(result.tax_breakdown.income_tax === 0, 'Roth qualified: no income tax');
+  assert(result.tax_breakdown.capital_gains_tax === 0, 'Roth qualified: no CGT');
+  assert(result.tax_breakdown.total === 0, 'Roth qualified: total tax = 0');
+  assert(result.net_withdrawal === 50_000, 'Roth qualified: net = gross');
+}
+
+// ---------------------------------------------------------------------------
+// Test 46: computeWrapperTax for US-Roth — non-qualified (young)
+// ---------------------------------------------------------------------------
+console.log('\nTest 46: computeWrapperTax — US-Roth non-qualified');
+{
+  // Large gains to exceed the US standard deduction
+  const lots = [
+    { year_acquired: 2023, amount: 500_000, cost_basis: 100_000 },
+  ];
+  const result = computeWrapperTax('US-Roth-IRA', 200_000, lots, {
+    residence: 'US',
+    domicile: 'US',
+    cgtMethod: 'FIFO',
+    age: 45,
+    taxableIncome: 0,
+    holdingStartYear: 2023,
+    currentYear: 2025,
+  });
+  assert(result.tax_breakdown.income_tax > 0, 'Roth non-qualified: income tax on earnings');
+}
+
+// ---------------------------------------------------------------------------
+// Test 47: computeWrapperTax for UK-SIPP — 25% tax-free lump applied
+// ---------------------------------------------------------------------------
+console.log('\nTest 47: computeWrapperTax — UK-SIPP 25% tax-free');
+{
+  const lots = [
+    { year_acquired: 2010, amount: 400_000, cost_basis: 200_000 },
+  ];
+
+  // First withdrawal: 25% tax-free lump
+  const result = computeWrapperTax('UK-SIPP', 100_000, lots, {
+    residence: 'UK',
+    domicile: 'UK-Dom',
+    cgtMethod: 'FIFO',
+    age: 60,
+    taxableIncome: 0,
+    sippLumpClaimed: false,
+  });
+  // 25% tax-free = 25,000; 75,000 taxed as income
+  assert(result.tax_breakdown.income_tax > 0, 'UK-SIPP: income tax charged on taxable portion');
+  assert(result.net_withdrawal > 0, 'UK-SIPP: net withdrawal > 0');
+
+  // Second withdrawal: lump already claimed
+  const result2 = computeWrapperTax('UK-SIPP', 100_000, lots, {
+    residence: 'UK',
+    domicile: 'UK-Dom',
+    cgtMethod: 'FIFO',
+    age: 61,
+    taxableIncome: 0,
+    sippLumpClaimed: true,
+  });
+  // Full amount taxed
+  assert(
+    result2.tax_breakdown.income_tax > result.tax_breakdown.income_tax,
+    'UK-SIPP: more tax when lump already claimed',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 48: computeWrapperTax for UK-ISA — zero tax
+// ---------------------------------------------------------------------------
+console.log('\nTest 48: computeWrapperTax — UK-ISA zero tax');
+{
+  const lots = [
+    { year_acquired: 2010, amount: 100_000, cost_basis: 50_000 },
+  ];
+  const result = computeWrapperTax('UK-ISA', 30_000, lots, {
+    residence: 'UK',
+    domicile: 'UK-Dom',
+    cgtMethod: 'FIFO',
+    age: 65,
+    taxableIncome: 0,
+  });
+  assert(result.tax_breakdown.income_tax === 0, 'UK-ISA: no income tax');
+  assert(result.tax_breakdown.capital_gains_tax === 0, 'UK-ISA: no CGT');
+  assert(result.tax_breakdown.total === 0, 'UK-ISA: total = 0');
+  assert(result.net_withdrawal === 30_000, 'UK-ISA: net = gross');
+}
+
+// ---------------------------------------------------------------------------
+// Test 49: TaxLotTracker FIFO ordering
+// ---------------------------------------------------------------------------
+console.log('\nTest 49: TaxLotTracker FIFO');
+{
+  const tracker = new TaxLotTracker();
+  tracker.addLot(2020, 100, 100);
+  tracker.addLot(2021, 200, 150);
+  tracker.addLot(2022, 300, 200);
+
+  // Dispose 150 FIFO: should consume all of lot 2020 (100) + 50 of lot 2021
+  const gain = tracker.dispose(150, 'FIFO');
+  const remaining = tracker.getLots();
+
+  assert(remaining.length === 2, 'FIFO: 2 lots remain after disposing 150');
+  assert(remaining[0].year_acquired === 2021, 'FIFO: oldest remaining is 2021');
+  assert(
+    Math.abs(remaining[0].amount - 150) < 0.01,
+    `FIFO: lot 2021 has 150 remaining (got ${remaining[0].amount})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 50: TaxLotTracker HIFO ordering
+// ---------------------------------------------------------------------------
+console.log('\nTest 50: TaxLotTracker HIFO');
+{
+  const tracker = new TaxLotTracker();
+  tracker.addLot(2020, 100, 50);   // low cost basis
+  tracker.addLot(2021, 100, 200);  // high cost basis
+  tracker.addLot(2022, 100, 100);  // medium cost basis
+
+  // Dispose 100 HIFO: should consume lot 2021 (highest cost_basis = 200)
+  const gain = tracker.dispose(100, 'HIFO');
+  const remaining = tracker.getLots();
+
+  assert(remaining.length === 2, 'HIFO: 2 lots remain');
+  // Gain should be negative (we disposed high-cost lot: 100 proceeds - 200 basis = -100)
+  assert(gain < 0, `HIFO: realised gain is negative (sold at loss): ${gain}`);
+
+  // Remaining should be lots 2020 (cost 50) and 2022 (cost 100)
+  const costs = remaining.map((l) => l.cost_basis).sort((a, b) => a - b);
+  assert(costs[0] === 50, 'HIFO: low-cost lot remains');
+  assert(costs[1] === 100, 'HIFO: medium-cost lot remains');
+}
+
+// ---------------------------------------------------------------------------
+// Test 51: RMD_DIVISOR_TABLE coverage
+// ---------------------------------------------------------------------------
+console.log('\nTest 51: RMD_DIVISOR_TABLE');
+{
+  assert(RMD_DIVISOR_TABLE[72] === 27.4, 'RMD divisor at 72 = 27.4');
+  assert(RMD_DIVISOR_TABLE[120] === 2.0, 'RMD divisor at 120 = 2.0');
+  const ages = Object.keys(RMD_DIVISOR_TABLE).map(Number);
+  assert(ages.length === 49, `RMD table has 49 entries (72-120, got ${ages.length})`);
+  assert(Math.min(...ages) === 72, 'RMD table starts at 72');
+  assert(Math.max(...ages) === 120, 'RMD table ends at 120');
+}
+
+// ---------------------------------------------------------------------------
+// Test 52: WITHHOLDING_TREATY_TABLE
+// ---------------------------------------------------------------------------
+console.log('\nTest 52: WITHHOLDING_TREATY_TABLE');
+{
+  assert(WITHHOLDING_TREATY_TABLE['US:UK'] === 0.15, 'US->UK withholding = 15%');
+  assert(WITHHOLDING_TREATY_TABLE['US:Cayman'] === 0.30, 'US->Cayman withholding = 30%');
+  assert(WITHHOLDING_TREATY_TABLE['US:UAE'] === 0.00, 'US->UAE withholding = 0%');
+  assert(WITHHOLDING_TREATY_TABLE['UK:US'] === 0.00, 'UK->US withholding = 0%');
+}
+
+// ---------------------------------------------------------------------------
+// Test 53: getWithholdingRate with overrides
+// ---------------------------------------------------------------------------
+console.log('\nTest 53: getWithholdingRate overrides');
+{
+  const rate = getWithholdingRate('US', 'UK');
+  assert(rate === 0.15, 'default US->UK = 0.15');
+
+  const overridden = getWithholdingRate('US', 'UK', { 'US:UK': 0.05 });
+  assert(overridden === 0.05, 'overridden US->UK = 0.05');
+}
+
+// ---------------------------------------------------------------------------
+// Test 54: US_FEDERAL_TAX_BRACKETS_2025 exported
+// ---------------------------------------------------------------------------
+console.log('\nTest 54: US_FEDERAL_TAX_BRACKETS_2025');
+{
+  assert(US_FEDERAL_TAX_BRACKETS_2025.length === 7, 'US brackets: 7 entries');
+  assert(US_FEDERAL_TAX_BRACKETS_2025[0].rate === 0.10, 'US lowest bracket = 10%');
+  assert(US_FEDERAL_TAX_BRACKETS_2025[6].rate === 0.37, 'US highest bracket = 37%');
+}
+
+// ---------------------------------------------------------------------------
+// Test 55: UK_INCOME_TAX_BANDS_2025 exported
+// ---------------------------------------------------------------------------
+console.log('\nTest 55: UK_INCOME_TAX_BANDS_2025');
+{
+  assert(UK_INCOME_TAX_BANDS_2025.length === 3, 'UK bands: 3 entries');
+  assert(UK_INCOME_TAX_BANDS_2025[0].rate === 0.20, 'UK basic rate = 20%');
+  assert(UK_INCOME_TAX_BANDS_2025[2].rate === 0.45, 'UK additional rate = 45%');
+}
+
+// ---------------------------------------------------------------------------
+// Test 56: Cayman-Exempt-Company — zero tax for Cayman resident
+// ---------------------------------------------------------------------------
+console.log('\nTest 56: Cayman-Exempt-Company zero tax');
+{
+  const lots = [{ year_acquired: 2020, amount: 500_000, cost_basis: 200_000 }];
+  const result = computeWrapperTax('Cayman-Exempt-Company', 100_000, lots, {
+    residence: 'Cayman',
+    domicile: 'Non-Dom',
+    cgtMethod: 'FIFO',
+    age: 60,
+    taxableIncome: 0,
+  });
+  assert(result.tax_breakdown.total === 0, 'Cayman exempt: zero tax for Cayman resident');
+  assert(result.net_withdrawal === 100_000, 'Cayman exempt: net = gross');
+}
+
+// ---------------------------------------------------------------------------
+// Test 57: Offshore-Trust — taxed on distribution to UK resident
+// ---------------------------------------------------------------------------
+console.log('\nTest 57: Offshore-Trust taxed for UK resident');
+{
+  const lots = [{ year_acquired: 2020, amount: 500_000, cost_basis: 200_000 }];
+  const result = computeWrapperTax('Offshore-Trust', 100_000, lots, {
+    residence: 'UK',
+    domicile: 'UK-Dom',
+    cgtMethod: 'FIFO',
+    age: 60,
+    taxableIncome: 0,
+  });
+  assert(result.tax_breakdown.income_tax > 0, 'Offshore Trust: UK resident pays income tax on distribution');
+}
+
+// ---------------------------------------------------------------------------
+// Test 58: UK non-dom remittance basis charge
+// ---------------------------------------------------------------------------
+console.log('\nTest 58: UK non-dom remittance basis charge');
+{
+  const lots = [{ year_acquired: 2020, amount: 500_000, cost_basis: 200_000 }];
+  const result = computeWrapperTax('UK-Offshore-Bond', 100_000, lots, {
+    residence: 'UK',
+    domicile: 'UK-Non-Dom',
+    cgtMethod: 'FIFO',
+    age: 60,
+    taxableIncome: 0,
+    remittanceBasisCharge: true,
+  });
+  assert(
+    result.tax_breakdown.remittance_basis_charge === 30_000,
+    `remittance basis charge = 30,000 (got ${result.tax_breakdown.remittance_basis_charge})`,
+  );
+  assert(result.tax_breakdown.total > 30_000, 'total includes remittance charge + income tax');
+}
+
+// ---------------------------------------------------------------------------
+// Test 59: TaxLotTracker — growth does not change cost basis
+// ---------------------------------------------------------------------------
+console.log('\nTest 59: TaxLotTracker growth preserves cost basis');
+{
+  const tracker = new TaxLotTracker();
+  tracker.addLot(2020, 100, 100);
+  tracker.applyGrowth(0.10); // 10% growth
+
+  const lots = tracker.getLots();
+  assert(Math.abs(lots[0].amount - 110) < 0.01, 'amount grew by 10%');
+  assert(lots[0].cost_basis === 100, 'cost basis unchanged after growth');
+}
+
+// ---------------------------------------------------------------------------
+// Test 60: Backwards compat — v0.5 scenario (no wrappers) identical output
+// ---------------------------------------------------------------------------
+console.log('\nTest 60: v0.5 backwards compat — no wrappers');
+{
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    current_age: 30,
+    retirement_age: 65,
+    end_age: 90,
+    current_balance: 500_000,
+    contrib_amount: 10_000,
+    contrib_cadence: 'Annual',
+    nominal_return_pct: 7,
+    return_stdev_pct: 12,
+    return_distribution: 'log-normal',
+    inflation_pct: 2.5,
+    fee_pct: 0.5,
+    enable_mc: false,
+    black_swan_enabled: false,
+  };
+
+  const { metrics } = runProjection(scenario);
+  const tolerance = 0.01;
+
+  assert(
+    Math.abs(metrics.terminal_real - v03Fixture.detRunMetrics.terminal_real) < tolerance,
+    `v0.5 compat: terminal_real matches (${metrics.terminal_real.toFixed(2)})`,
+  );
+  assert(
+    Math.abs(metrics.terminal_nominal - v03Fixture.detRunMetrics.terminal_nominal) < tolerance,
+    `v0.5 compat: terminal_nominal matches`,
+  );
+
+  // Verify new fields exist but are null/0
+  const row = metrics;
+  const { timeline } = runProjection(scenario);
+  assert(timeline[0].tax_breakdown === null, 'basic mode: tax_breakdown is null');
+  assert(typeof timeline[0].rmd_amount === 'number', 'basic mode: rmd_amount is a number');
+}
+
+// ---------------------------------------------------------------------------
+// Test 61: US-Traditional wrapper — full withdrawal taxed as income
+// ---------------------------------------------------------------------------
+console.log('\nTest 61: US-Traditional — withdrawal taxed as income');
+{
+  const lots = [{ year_acquired: 2010, amount: 500_000, cost_basis: 300_000 }];
+  const result = computeWrapperTax('US-Traditional-401k', 50_000, lots, {
+    residence: 'US',
+    domicile: 'US',
+    cgtMethod: 'FIFO',
+    age: 70,
+    taxableIncome: 50_000,
+  });
+  assert(result.tax_breakdown.income_tax > 0, 'US-Traditional: income tax on withdrawal');
+  assert(result.tax_breakdown.capital_gains_tax === 0, 'US-Traditional: no CGT (taxed as income)');
+}
+
+// ---------------------------------------------------------------------------
+// Test 62: computeRMD returns 0 for zero balance
+// ---------------------------------------------------------------------------
+console.log('\nTest 62: computeRMD — zero balance');
+{
+  assert(computeRMD(75, 0) === 0, 'RMD with zero balance = 0');
+  assert(computeRMD(75, -100) === 0, 'RMD with negative balance = 0');
 }
 
 // ---------------------------------------------------------------------------
