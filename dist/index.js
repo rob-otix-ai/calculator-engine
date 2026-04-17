@@ -33,5 +33,8 @@ export { resolveWeights } from './glide-path.js';
 export { computeEfficientFrontier } from './efficient-frontier.js';
 // v0.5 — Claiming optimizers (ADR-036 / CONTRACT-019)
 export { optimizeSsClaiming, optimizePensionClaiming, optimizeAnnuityTiming, SSA_ADJUSTMENT_FACTORS, ANNUITY_RATE_TABLE, } from './claiming-optimizers.js';
+// v0.6 — Onshore/Offshore Tax (ADR-037 / CONTRACT-020)
+export { computeWrapperTax, computeRMD, getWithholdingRate, RMD_DIVISOR_TABLE, WITHHOLDING_TREATY_TABLE, US_FEDERAL_TAX_BRACKETS_2025, UK_INCOME_TAX_BANDS_2025, } from './wrapper-tax.js';
+export { TaxLotTracker } from './tax-lots.js';
 // Logger utilities
 export { getLogger, setLogLevel, setLogger } from './logger.js';

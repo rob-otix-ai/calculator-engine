@@ -1,4 +1,4 @@
-export type { Cadence, CurrencyCode, ContribStep, ProfitStep, RaiseStep, YieldStep, IncomeStep, LoanDraw, LumpRepayment, SpendingPhase, TaxConfig, IncomeSource, Asset, LiquidityEvent, FinancialItemCategory, FinancialItem, Scenario, TimelineRow, WithdrawalEvent, FanChartRow, Metrics, AssetClass, AssetClassId, ReturnCorrelationMatrix, RiskMetrics, ReturnProcess, InflationProcess, LongevityModel, Sex, ReturnSampler, InflationSampler, LongevitySampler, GlidePathStep, FrontierPoint, EfficientFrontierResult, ClaimingOptimizerResult, } from './types';
+export type { Cadence, CurrencyCode, ContribStep, ProfitStep, RaiseStep, YieldStep, IncomeStep, LoanDraw, LumpRepayment, SpendingPhase, TaxConfig, IncomeSource, Asset, LiquidityEvent, FinancialItemCategory, FinancialItem, Scenario, TimelineRow, WithdrawalEvent, FanChartRow, Metrics, AssetClass, AssetClassId, ReturnCorrelationMatrix, RiskMetrics, ReturnProcess, InflationProcess, LongevityModel, Sex, ReturnSampler, InflationSampler, LongevitySampler, GlidePathStep, FrontierPoint, EfficientFrontierResult, ClaimingOptimizerResult, TaxResidence, TaxDomicile, TaxWrapper, TaxLot, TaxBreakdown, WrapperTaxResult, } from './types';
 export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
 export { runProjection } from './projection';
 export { runAdvancedProjection } from './advanced';
@@ -17,5 +17,7 @@ export { computeRiskMetrics, type MCRiskInputs } from './risk-metrics';
 export { resolveWeights } from './glide-path';
 export { computeEfficientFrontier } from './efficient-frontier';
 export { optimizeSsClaiming, optimizePensionClaiming, optimizeAnnuityTiming, SSA_ADJUSTMENT_FACTORS, ANNUITY_RATE_TABLE, } from './claiming-optimizers';
+export { computeWrapperTax, computeRMD, getWithholdingRate, RMD_DIVISOR_TABLE, WITHHOLDING_TREATY_TABLE, US_FEDERAL_TAX_BRACKETS_2025, UK_INCOME_TAX_BANDS_2025, } from './wrapper-tax';
+export { TaxLotTracker } from './tax-lots';
 export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';
 //# sourceMappingURL=index.d.ts.map

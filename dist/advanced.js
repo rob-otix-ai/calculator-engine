@@ -20,6 +20,8 @@ import { CadenceMultiplier } from './defaults.js';
 import { calculateTax } from './tax.js';
 import { calculateWithdrawal, } from './withdrawal.js';
 import { getLogger } from './logger.js';
+import { computeWrapperTax, computeRMD, } from './wrapper-tax.js';
+import { TaxLotTracker } from './tax-lots.js';
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -139,7 +141,7 @@ const INCOME_CATEGORIES = new Set([
 // Main Projection
 // =============================================================================
 export function runAdvancedProjection(scenario, overrideReturns) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12;
     const { current_age, retirement_age, end_age, inflation_pct, inflation_enabled, financial_items, liquidity_events, enable_taxes, effective_tax_rate_pct, tax_jurisdiction, tax_config, black_swan_enabled, black_swan_age, black_swan_loss_pct, desired_estate, } = scenario;
     const log = getLogger();
     log.info('Starting advanced projection', {
@@ -181,6 +183,28 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             }
         }
     }
+    // -------------------------------------------------------------------------
+    // v0.6: Wrapper tax state
+    // -------------------------------------------------------------------------
+    const taxResidence = (_b = scenario.tax_residence) !== null && _b !== void 0 ? _b : 'Custom';
+    const taxDomicile = (_c = scenario.tax_domicile) !== null && _c !== void 0 ? _c : 'Non-Dom';
+    const cgtMethod = (_d = scenario.cgt_method) !== null && _d !== void 0 ? _d : 'FIFO';
+    const remittanceBasisCharge = (_e = scenario.remittance_basis_charge) !== null && _e !== void 0 ? _e : false;
+    const withholdingOverrides = (_f = scenario.withholding_overrides) !== null && _f !== void 0 ? _f : {};
+    const hasWrappers = items.some((i) => i.wrapper && i.wrapper !== 'Taxable');
+    // Tax-lot trackers per investment item
+    const lotTrackers = new Map();
+    for (let idx = 0; idx < financial_items.length; idx++) {
+        const item = financial_items[idx];
+        if (!item.enabled || item.category !== 'Investment')
+            continue;
+        const tracker = new TaxLotTracker();
+        const basis = (_g = item.cost_basis) !== null && _g !== void 0 ? _g : item.current_value;
+        tracker.addLot(current_age, item.current_value, basis);
+        lotTrackers.set(idx, tracker);
+    }
+    // SIPP lump tracking per item
+    const sippLumpClaimed = new Map();
     // -------------------------------------------------------------------------
     // Accumulators
     // -------------------------------------------------------------------------
@@ -245,8 +269,8 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 item.reinvest_target_item_index != null &&
                 investmentBalances.has(item.reinvest_target_item_index)) {
                 const targetIdx = item.reinvest_target_item_index;
-                investmentBalances.set(targetIdx, ((_b = investmentBalances.get(targetIdx)) !== null && _b !== void 0 ? _b : 0) + net);
-                costBasis.set(targetIdx, ((_c = costBasis.get(targetIdx)) !== null && _c !== void 0 ? _c : 0) + net);
+                investmentBalances.set(targetIdx, ((_h = investmentBalances.get(targetIdx)) !== null && _h !== void 0 ? _h : 0) + net);
+                costBasis.set(targetIdx, ((_j = costBasis.get(targetIdx)) !== null && _j !== void 0 ? _j : 0) + net);
             }
             else {
                 cashBalance += net;
@@ -264,7 +288,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 const step = resolveStaggeredStep(item.income_steps, age);
                 if (!step)
                     continue;
-                const freq = (_d = step.frequency) !== null && _d !== void 0 ? _d : item.income_frequency;
+                const freq = (_k = step.frequency) !== null && _k !== void 0 ? _k : item.income_frequency;
                 income = step.amount * (freq === 'Monthly' ? 12 : 1);
             }
             else {
@@ -337,7 +361,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             const item = financial_items[idx];
             if (!item.enabled || item.category !== 'Loan')
                 continue;
-            const balance = (_e = loanBalances.get(idx)) !== null && _e !== void 0 ? _e : 0;
+            const balance = (_l = loanBalances.get(idx)) !== null && _l !== void 0 ? _l : 0;
             if (balance <= 0 && !item.loan_draws.some((d) => d.age === age))
                 continue;
             // Interest
@@ -365,7 +389,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             // Loan draws at this age
             for (const draw of item.loan_draws) {
                 if (draw.age === age && age >= item.loan_start_age) {
-                    loanBalances.set(idx, ((_f = loanBalances.get(idx)) !== null && _f !== void 0 ? _f : 0) + draw.amount);
+                    loanBalances.set(idx, ((_m = loanBalances.get(idx)) !== null && _m !== void 0 ? _m : 0) + draw.amount);
                     if (item.loan_credit_at_start) {
                         cashBalance += draw.amount;
                     }
@@ -374,7 +398,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             // Lump repayments at this age
             for (const repay of item.loan_lump_repayments) {
                 if (repay.age === age) {
-                    const currentBal = (_g = loanBalances.get(idx)) !== null && _g !== void 0 ? _g : 0;
+                    const currentBal = (_o = loanBalances.get(idx)) !== null && _o !== void 0 ? _o : 0;
                     const actual = Math.min(repay.amount, Math.max(0, currentBal));
                     cashBalance -= actual;
                     loanBalances.set(idx, currentBal - actual);
@@ -402,11 +426,11 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 continue;
             const isInvestment = item.category === 'Investment';
             const currentValue = isInvestment
-                ? (_h = investmentBalances.get(idx)) !== null && _h !== void 0 ? _h : 0
-                : (_j = propertyValues.get(idx)) !== null && _j !== void 0 ? _j : 0;
-            const currentBasis = (_k = costBasis.get(idx)) !== null && _k !== void 0 ? _k : 0;
+                ? (_p = investmentBalances.get(idx)) !== null && _p !== void 0 ? _p : 0
+                : (_q = propertyValues.get(idx)) !== null && _q !== void 0 ? _q : 0;
+            const currentBasis = (_r = costBasis.get(idx)) !== null && _r !== void 0 ? _r : 0;
             if (item.profit_taking_mode === 'single' && item.sell_at_age === age) {
-                const proceeds = (_l = item.sale_amount_override) !== null && _l !== void 0 ? _l : currentValue;
+                const proceeds = (_s = item.sale_amount_override) !== null && _s !== void 0 ? _s : currentValue;
                 const gain = proceeds - currentBasis;
                 const tax = item.taxable_on_sale
                     ? Math.max(0, gain) * (item.sale_tax_rate / 100)
@@ -432,9 +456,9 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                     if (!matches)
                         continue;
                     const bal = isInvestment
-                        ? (_m = investmentBalances.get(idx)) !== null && _m !== void 0 ? _m : 0
-                        : (_o = propertyValues.get(idx)) !== null && _o !== void 0 ? _o : 0;
-                    const basis = (_p = costBasis.get(idx)) !== null && _p !== void 0 ? _p : 0;
+                        ? (_t = investmentBalances.get(idx)) !== null && _t !== void 0 ? _t : 0
+                        : (_u = propertyValues.get(idx)) !== null && _u !== void 0 ? _u : 0;
+                    const basis = (_v = costBasis.get(idx)) !== null && _v !== void 0 ? _v : 0;
                     const sellAmount = bal * (step.pct / 100);
                     const proportionalBasis = basis * (step.pct / 100);
                     const gain = sellAmount - proportionalBasis;
@@ -504,9 +528,13 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                     contrib = Math.max(0, cashBalance);
                 }
                 cashBalance -= contrib;
-                investmentBalances.set(idx, ((_q = investmentBalances.get(idx)) !== null && _q !== void 0 ? _q : 0) + contrib);
-                costBasis.set(idx, ((_r = costBasis.get(idx)) !== null && _r !== void 0 ? _r : 0) + contrib);
+                investmentBalances.set(idx, ((_w = investmentBalances.get(idx)) !== null && _w !== void 0 ? _w : 0) + contrib);
+                costBasis.set(idx, ((_x = costBasis.get(idx)) !== null && _x !== void 0 ? _x : 0) + contrib);
                 yearContributions += contrib;
+                // v0.6: track lot for CGT
+                const tracker = lotTrackers.get(idx);
+                if (tracker)
+                    tracker.addLot(age, contrib);
             }
         }
         // =====================================================================
@@ -544,11 +572,101 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 yearTaxableIncome += yearWithdrawals;
         }
         // =====================================================================
+        // 6b. v0.6 — RMD ENFORCEMENT (US-Traditional wrappers)
+        // =====================================================================
+        let yearRmdAmount = 0;
+        if (hasWrappers) {
+            for (let idx = 0; idx < financial_items.length; idx++) {
+                const item = financial_items[idx];
+                if (!item.enabled || item.category !== 'Investment')
+                    continue;
+                const w = (_y = item.wrapper) !== null && _y !== void 0 ? _y : 'Taxable';
+                if (w !== 'US-Traditional-401k' && w !== 'US-Traditional-IRA')
+                    continue;
+                const balance = (_z = investmentBalances.get(idx)) !== null && _z !== void 0 ? _z : 0;
+                const rmd = computeRMD(age, balance);
+                if (rmd > 0 && rmd > yearWithdrawals) {
+                    const additionalWithdrawal = Math.min(rmd, balance);
+                    const tracker = lotTrackers.get(idx);
+                    if (tracker)
+                        tracker.dispose(additionalWithdrawal, cgtMethod);
+                    investmentBalances.set(idx, Math.max(0, balance - additionalWithdrawal));
+                    cashBalance += additionalWithdrawal;
+                    yearRmdAmount += additionalWithdrawal;
+                    yearTaxableIncome += additionalWithdrawal;
+                }
+            }
+        }
+        // =====================================================================
+        // 6c. v0.6 — PER-WRAPPER TAX COMPUTATION
+        // =====================================================================
+        let yearTaxBreakdown = null;
+        if (hasWrappers && enable_taxes && yearWithdrawals > 0) {
+            yearTaxBreakdown = {
+                income_tax: 0,
+                capital_gains_tax: 0,
+                dividend_withholding: 0,
+                rmd_forced_withdrawal: yearRmdAmount,
+                remittance_basis_charge: 0,
+                total: 0,
+            };
+            // Compute wrapper tax per item that had withdrawals
+            // For simplicity, apply wrapper tax to the total withdrawal from cash
+            // proportional to each wrapper's share of liquid investments
+            for (let idx = 0; idx < financial_items.length; idx++) {
+                const item = financial_items[idx];
+                if (!item.enabled || item.category !== 'Investment')
+                    continue;
+                const w = (_0 = item.wrapper) !== null && _0 !== void 0 ? _0 : 'Taxable';
+                // Approximate: compute tax as if the withdrawal came from this wrapper
+                const tracker = lotTrackers.get(idx);
+                const lots = tracker ? tracker.getLots() : [];
+                const wrapperConfig = {
+                    residence: taxResidence,
+                    domicile: taxDomicile,
+                    cgtMethod,
+                    age,
+                    taxableIncome: yearTaxableIncome,
+                    withholdingOverrides,
+                    remittanceBasisCharge,
+                    sippLumpClaimed: (_1 = sippLumpClaimed.get(idx)) !== null && _1 !== void 0 ? _1 : false,
+                };
+                // Only compute if this wrapper type needs special treatment
+                if (w !== 'Taxable') {
+                    // The share of withdrawal attributable to this wrapper
+                    const totalInv = sumMap(investmentBalances);
+                    const balance = (_2 = investmentBalances.get(idx)) !== null && _2 !== void 0 ? _2 : 0;
+                    const share = totalInv > 0 ? balance / totalInv : 0;
+                    const wrapperWithdrawal = yearWithdrawals * share;
+                    if (wrapperWithdrawal > 0) {
+                        const result = computeWrapperTax(w, wrapperWithdrawal, lots, wrapperConfig);
+                        yearTaxBreakdown.income_tax += result.tax_breakdown.income_tax;
+                        yearTaxBreakdown.capital_gains_tax += result.tax_breakdown.capital_gains_tax;
+                        yearTaxBreakdown.dividend_withholding += result.tax_breakdown.dividend_withholding;
+                        yearTaxBreakdown.remittance_basis_charge += result.tax_breakdown.remittance_basis_charge;
+                        // Mark SIPP lump as claimed
+                        if (w === 'UK-SIPP' && !sippLumpClaimed.get(idx)) {
+                            sippLumpClaimed.set(idx, true);
+                        }
+                    }
+                }
+            }
+            yearTaxBreakdown.total = yearTaxBreakdown.income_tax
+                + yearTaxBreakdown.capital_gains_tax
+                + yearTaxBreakdown.dividend_withholding
+                + yearTaxBreakdown.rmd_forced_withdrawal
+                + yearTaxBreakdown.remittance_basis_charge;
+        }
+        // =====================================================================
         // 7. TAX SETTLEMENT
         // =====================================================================
         if (enable_taxes && yearTaxableIncome > 0) {
             let jurisdictionTax = 0;
-            if (tax_config) {
+            if (hasWrappers && yearTaxBreakdown) {
+                // v0.6: wrapper-aware tax already computed; use it
+                jurisdictionTax = yearTaxBreakdown.income_tax + yearTaxBreakdown.capital_gains_tax;
+            }
+            else if (tax_config) {
                 jurisdictionTax = calculateTax(yearTaxableIncome, tax_config, tax_jurisdiction);
             }
             else {
@@ -579,11 +697,11 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             const item = financial_items[idx];
             if (!item.enabled || item.category !== 'Investment')
                 continue;
-            const balance = (_s = investmentBalances.get(idx)) !== null && _s !== void 0 ? _s : 0;
+            const balance = (_3 = investmentBalances.get(idx)) !== null && _3 !== void 0 ? _3 : 0;
             if (balance <= 0)
                 continue;
             let returnRate = overrideReturns != null
-                ? ((_t = overrideReturns[yearIndex]) !== null && _t !== void 0 ? _t : item.rate_pct / 100)
+                ? ((_4 = overrideReturns[yearIndex]) !== null && _4 !== void 0 ? _4 : item.rate_pct / 100)
                 : item.rate_pct / 100;
             // Apply black swan
             if (blackSwanActive) {
@@ -598,7 +716,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             const mgmtFee = balance * (item.fee_pct / 100);
             // Performance fee (high-water mark)
             let perfFee = 0;
-            const hwm = (_u = highWaterMarks.get(idx)) !== null && _u !== void 0 ? _u : 0;
+            const hwm = (_5 = highWaterMarks.get(idx)) !== null && _5 !== void 0 ? _5 : 0;
             const postGrowthValue = balance + grossReturn - mgmtFee;
             if (postGrowthValue > hwm && item.perf_fee_pct > 0) {
                 const gainAboveHWM = postGrowthValue - hwm;
@@ -607,6 +725,12 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             }
             const newBalance = balance + grossReturn - mgmtFee - perfFee;
             investmentBalances.set(idx, Math.max(0, newBalance));
+            // v0.6: update lot tracker with growth
+            const tracker = lotTrackers.get(idx);
+            if (tracker) {
+                const netReturnRate = (grossReturn - mgmtFee - perfFee) / (balance || 1);
+                tracker.applyGrowth(netReturnRate);
+            }
             yearGrowth += grossReturn;
             yearFees += mgmtFee + perfFee;
         }
@@ -617,7 +741,7 @@ export function runAdvancedProjection(scenario, overrideReturns) {
                 continue;
             if (item.category !== 'Property' && item.category !== 'Collectables')
                 continue;
-            const value = (_v = propertyValues.get(idx)) !== null && _v !== void 0 ? _v : 0;
+            const value = (_6 = propertyValues.get(idx)) !== null && _6 !== void 0 ? _6 : 0;
             if (value <= 0)
                 continue;
             // Skip growth if not yet purchased
@@ -657,14 +781,14 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             if (!item.enabled)
                 continue;
             if (item.category === 'Investment') {
-                const bal = (_w = investmentBalances.get(idx)) !== null && _w !== void 0 ? _w : 0;
+                const bal = (_7 = investmentBalances.get(idx)) !== null && _7 !== void 0 ? _7 : 0;
                 if (item.is_liquid)
                     endLiquid += bal;
                 else
                     endIlliquid += bal;
             }
             else if (item.category === 'Property' || item.category === 'Collectables') {
-                const val = (_x = propertyValues.get(idx)) !== null && _x !== void 0 ? _x : 0;
+                const val = (_8 = propertyValues.get(idx)) !== null && _8 !== void 0 ? _8 : 0;
                 if (item.is_liquid)
                     endLiquid += val;
                 else
@@ -710,6 +834,9 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             // multi-asset mode is not active in this code path.
             inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
             asset_returns: null,
+            // v0.6 additions
+            tax_breakdown: yearTaxBreakdown,
+            rmd_amount: yearRmdAmount,
         };
         timeline.push(row);
     }
@@ -717,8 +844,8 @@ export function runAdvancedProjection(scenario, overrideReturns) {
     // Compute Metrics
     // -------------------------------------------------------------------------
     const lastRow = timeline[timeline.length - 1];
-    const terminalNominal = (_y = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_nominal) !== null && _y !== void 0 ? _y : 0;
-    const terminalReal = (_z = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_real) !== null && _z !== void 0 ? _z : 0;
+    const terminalNominal = (_9 = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_nominal) !== null && _9 !== void 0 ? _9 : 0;
+    const terminalReal = (_10 = lastRow === null || lastRow === void 0 ? void 0 : lastRow.end_balance_real) !== null && _10 !== void 0 ? _10 : 0;
     // Estate value: sum of projected values * estate_pct, minus debt
     let estateValue = 0;
     for (let idx = 0; idx < financial_items.length; idx++) {
@@ -727,10 +854,10 @@ export function runAdvancedProjection(scenario, overrideReturns) {
             continue;
         let projectedValue = 0;
         if (item.category === 'Investment') {
-            projectedValue = (_0 = investmentBalances.get(idx)) !== null && _0 !== void 0 ? _0 : 0;
+            projectedValue = (_11 = investmentBalances.get(idx)) !== null && _11 !== void 0 ? _11 : 0;
         }
         else if (item.category === 'Property' || item.category === 'Collectables') {
-            projectedValue = (_1 = propertyValues.get(idx)) !== null && _1 !== void 0 ? _1 : 0;
+            projectedValue = (_12 = propertyValues.get(idx)) !== null && _12 !== void 0 ? _12 : 0;
         }
         else if (item.category === 'Cash') {
             projectedValue = cashBalance;

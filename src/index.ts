@@ -42,6 +42,13 @@ export type {
   FrontierPoint,
   EfficientFrontierResult,
   ClaimingOptimizerResult,
+  // v0.6 onshore/offshore tax types (CONTRACT-020)
+  TaxResidence,
+  TaxDomicile,
+  TaxWrapper,
+  TaxLot,
+  TaxBreakdown,
+  WrapperTaxResult,
 } from './types';
 
 export { CadenceMultiplier, CURRENCY_MAP, DEFAULT_SCENARIO, type CurrencyInfo } from './defaults';
@@ -151,6 +158,19 @@ export {
   SSA_ADJUSTMENT_FACTORS,
   ANNUITY_RATE_TABLE,
 } from './claiming-optimizers';
+
+// v0.6 — Onshore/Offshore Tax (ADR-037 / CONTRACT-020)
+export {
+  computeWrapperTax,
+  computeRMD,
+  getWithholdingRate,
+  RMD_DIVISOR_TABLE,
+  WITHHOLDING_TREATY_TABLE,
+  US_FEDERAL_TAX_BRACKETS_2025,
+  UK_INCOME_TAX_BANDS_2025,
+} from './wrapper-tax';
+
+export { TaxLotTracker } from './tax-lots';
 
 // Logger utilities
 export { getLogger, setLogLevel, setLogger, type Logger, type LogLevel } from './logger';

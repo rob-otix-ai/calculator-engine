@@ -391,6 +391,9 @@ export function runProjection(scenario, overrideReturns) {
             // asset_returns is null because we are not in multi-asset mode.
             inflation_this_year: inflation_enabled ? inflation_pct / 100 : 0,
             asset_returns: null,
+            // v0.6 additions — basic mode has no wrappers; defaults for compat.
+            tax_breakdown: null,
+            rmd_amount: rmdAmount,
         };
         log.debug('Year end', { age, end_balance: endBalance });
         timeline.push(row);
